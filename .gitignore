@@ -1,0 +1,6 @@
+/artifacts/
+/dist/
+/Kerneon*.exe
+/qa-*.png
+*.test
+*.prof
