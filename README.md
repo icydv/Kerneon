@@ -40,7 +40,7 @@ For an extended runtime check:
 .\scripts\soak.ps1 -DurationMinutes 120 -IntervalSeconds 5
 ```
 
-The build has no third-party runtime Go modules. See `THIRD_PARTY_NOTICES.md`, `docs\ARCHITECTURE.md`, `docs\TESTING.md`, and `docs\KNOWN_LIMITATIONS.md`.
+The build has no third-party runtime Go modules. See `THIRD_PARTY_NOTICES.md`, `docs\AI_INSIGHTS.md`, `docs\OPTIMIZE.md`, `docs\ARCHITECTURE.md`, `docs\TESTING.md`, and `docs\KNOWN_LIMITATIONS.md`.
 
 ## Keyboard shortcuts
 
