@@ -19,39 +19,69 @@ type RateFormatter struct {
 	unit      int
 	candidate int
 	since     time.Time
+	ready     bool
 }
 
 var bitUnits = []string{"bps", "Kbps", "Mbps", "Gbps", "Tbps"}
 var byteUnits = []string{"B/s", "KB/s", "MB/s", "GB/s", "TB/s"}
 
 func (f *RateFormatter) Format(bytesPerSecond float64, now time.Time) string {
+	base, units, wanted := rateParts(bytesPerSecond, f.Mode)
+	if !f.ready {
+		// Initializing at the correct magnitude prevents the first 650 ms from
+		// leaking a large raw B/s or bps value before hysteresis can settle.
+		f.unit, f.candidate, f.ready = wanted, wanted, true
+	} else if f.Mode == UnitAuto || f.Mode == "" {
+		f.applyHysteresis(base, wanted, now)
+	} else {
+		f.unit = wanted
+	}
+	return formatRateParts(base, units, f.unit)
+}
+
+func (f *RateFormatter) SetMode(mode UnitMode) {
+	if f.Mode == mode {
+		return
+	}
+	*f = RateFormatter{Mode: mode}
+}
+
+func (f *RateFormatter) Reset() {
+	mode := f.Mode
+	*f = RateFormatter{Mode: mode}
+}
+
+// FormatRate is stateless and intended for secondary values such as peaks and
+// graph tooltips. It cannot disturb a live formatter's hysteresis state.
+func FormatRate(bytesPerSecond float64, mode UnitMode) string {
+	base, units, wanted := rateParts(bytesPerSecond, mode)
+	return formatRateParts(base, units, wanted)
+}
+
+func rateParts(bytesPerSecond float64, mode UnitMode) (float64, []string, int) {
 	if bytesPerSecond < 0 || math.IsNaN(bytesPerSecond) || math.IsInf(bytesPerSecond, 0) {
 		bytesPerSecond = 0
 	}
-	base := bytesPerSecond * 8
-	units := bitUnits
-	if f.Mode == UnitBytes {
-		base = bytesPerSecond
-		units = byteUnits
+	base, units := bytesPerSecond*8, bitUnits
+	if mode == UnitBytes {
+		base, units = bytesPerSecond, byteUnits
 	}
 	wanted := 0
 	for wanted < len(units)-1 && base >= math.Pow(1000, float64(wanted+1)) {
 		wanted++
 	}
-	if f.Mode == UnitAuto || f.Mode == "" {
-		f.applyHysteresis(base, wanted, now)
-	} else {
-		f.unit = wanted
-	}
-	div := math.Pow(1000, float64(f.unit))
-	value := base / div
+	return base, units, wanted
+}
+
+func formatRateParts(base float64, units []string, unit int) string {
+	value := base / math.Pow(1000, float64(unit))
 	precision := 0
-	if value < 10 && f.unit > 0 {
+	if value < 10 && unit > 0 {
 		precision = 2
-	} else if value < 100 && f.unit > 0 {
+	} else if value < 100 && unit > 0 {
 		precision = 1
 	}
-	return fmt.Sprintf("%.*f %s", precision, value, units[f.unit])
+	return fmt.Sprintf("%.*f %s", precision, value, units[unit])
 }
 
 func (f *RateFormatter) applyHysteresis(base float64, wanted int, now time.Time) {

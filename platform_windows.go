@@ -61,6 +61,10 @@ const (
 	SRCCOPY                        = 0x00CC0020
 	DWMWA_USE_IMMERSIVE_DARK_MODE  = 20
 	DWMWA_WINDOW_CORNER_PREFERENCE = 33
+	DWMWA_BORDER_COLOR             = 34
+	DWMWA_CAPTION_COLOR            = 35
+	DWMWA_SYSTEMBACKDROP_TYPE      = 38
+	DWMSBT_MAINWINDOW              = 2
 	DWMWCP_ROUND                   = 2
 	SWP_NOSIZE                     = 0x0001
 	SWP_NOMOVE                     = 0x0002
@@ -74,6 +78,9 @@ const (
 	MOVEFILE_REPLACE_EXISTING      = 0x1
 	MOVEFILE_WRITE_THROUGH         = 0x8
 	MONITOR_DEFAULTTONEAREST       = 2
+	WS_EX_LAYERED                  = 0x00080000
+	GWL_EXSTYLE                    = -20
+	LWA_ALPHA                      = 0x2
 )
 
 type POINT struct{ X, Y int32 }
@@ -144,18 +151,23 @@ var (
 	procPostMessageW                  = user32.NewProc("PostMessageW")
 	procSetWindowPos                  = user32.NewProc("SetWindowPos")
 	procSetForegroundWindow           = user32.NewProc("SetForegroundWindow")
+	procGetWindowLongPtrW             = user32.NewProc("GetWindowLongPtrW")
+	procSetWindowLongPtrW             = user32.NewProc("SetWindowLongPtrW")
+	procSetLayeredWindowAttributes    = user32.NewProc("SetLayeredWindowAttributes")
 	procIsWindowVisible               = user32.NewProc("IsWindowVisible")
 	procGetDpiForWindow               = user32.NewProc("GetDpiForWindow")
 	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
 	procSetCapture                    = user32.NewProc("SetCapture")
 	procReleaseCapture                = user32.NewProc("ReleaseCapture")
 	procOpenClipboard                 = user32.NewProc("OpenClipboard")
+	procGetClipboardData              = user32.NewProc("GetClipboardData")
 	procEmptyClipboard                = user32.NewProc("EmptyClipboard")
 	procSetClipboardData              = user32.NewProc("SetClipboardData")
 	procCloseClipboard                = user32.NewProc("CloseClipboard")
 	procGlobalAlloc                   = kernel32.NewProc("GlobalAlloc")
 	procGlobalLock                    = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock                  = kernel32.NewProc("GlobalUnlock")
+	procGlobalSize                    = kernel32.NewProc("GlobalSize")
 	procRtlMoveMemory                 = ntdll.NewProc("RtlMoveMemory")
 	procMoveFileExW                   = kernel32.NewProc("MoveFileExW")
 	procGetModuleHandleW              = kernel32.NewProc("GetModuleHandleW")
@@ -188,6 +200,9 @@ var (
 func utf16Ptr(s string) *uint16 { p, _ := syscall.UTF16PtrFromString(s); return p }
 func lowWord(v uintptr) int32   { return int32(int16(v & 0xffff)) }
 func highWord(v uintptr) int32  { return int32(int16((v >> 16) & 0xffff)) }
+func windowLongIndex(v int32) uintptr {
+	return uintptr(int64(v))
+}
 
 func replaceFile(source, target string) error {
 	r, _, err := procMoveFileExW.Call(uintptr(unsafe.Pointer(utf16Ptr(source))), uintptr(unsafe.Pointer(utf16Ptr(target))), MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)

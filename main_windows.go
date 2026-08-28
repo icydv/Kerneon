@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -70,6 +71,8 @@ type App struct {
 	selectedPath               string
 	incident                   []HistorySample
 	compact                    bool
+	ai                         AIState
+	optimizer                  OptimizerState
 	back                       BackBuffer
 	downFormatter, upFormatter core.RateFormatter
 	scalers                    map[string]*core.GraphScaler
@@ -89,7 +92,9 @@ func main() {
 	store := NewConfigStore(logger)
 	cfg := store.Load()
 	a := &App{logger: logger, store: store, config: cfg, page: cfg.Window.LastPage, dpi: 96, renderStop: make(chan struct{}), scalers: make(map[string]*core.GraphScaler)}
+	a.ai.Connected = a.hasAIKey()
 	a.downFormatter.Mode, a.upFormatter.Mode = cfg.Network.Units, cfg.Network.Units
+	a.restoreInterruptedOptimization()
 	a.engine = NewTelemetryEngine(cfg, logger)
 	appInstance = a
 	if err := a.run(); err != nil {
@@ -128,9 +133,11 @@ func (a *App) run() error {
 	procDwmSetWindowAttribute.Call(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, uintptr(unsafe.Pointer(&dark)), unsafe.Sizeof(dark))
 	corner := int32(DWMWCP_ROUND)
 	procDwmSetWindowAttribute.Call(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, uintptr(unsafe.Pointer(&corner)), unsafe.Sizeof(corner))
+	a.applyWindowMaterial()
 	a.applyTopMost()
 	a.addTrayIcon()
 	a.engine.Start()
+	a.refreshPowerPlan()
 	go a.renderLoop()
 	procShowWindow.Call(hwnd, SW_SHOW)
 	procUpdateWindow.Call(hwnd)
@@ -369,6 +376,9 @@ func (a *App) navigate(page string) {
 	a.config.Window.LastPage = page
 	a.hoverValid = false
 	procInvalidateRect.Call(a.hwnd, 0, 0)
+	if page == "optimize" {
+		a.refreshPowerPlan()
+	}
 }
 func (a *App) px(v int32) int32 { return int32(float64(v) * float64(a.dpi) / 96.0) }
 func (a *App) applyTopMost() {
@@ -379,6 +389,30 @@ func (a *App) applyTopMost() {
 	if a.hwnd != 0 {
 		procSetWindowPos.Call(a.hwnd, insert, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_NOOWNERZORDER)
 	}
+}
+
+func (a *App) applyWindowMaterial() {
+	if a.hwnd == 0 {
+		return
+	}
+	backdrop := int32(DWMSBT_MAINWINDOW)
+	procDwmSetWindowAttribute.Call(a.hwnd, DWMWA_SYSTEMBACKDROP_TYPE, uintptr(unsafe.Pointer(&backdrop)), unsafe.Sizeof(backdrop))
+	caption := palette.BG
+	procDwmSetWindowAttribute.Call(a.hwnd, DWMWA_CAPTION_COLOR, uintptr(unsafe.Pointer(&caption)), unsafe.Sizeof(caption))
+	border := uint32(0xFFFFFFFE) // DWMWA_COLOR_NONE
+	procDwmSetWindowAttribute.Call(a.hwnd, DWMWA_BORDER_COLOR, uintptr(unsafe.Pointer(&border)), unsafe.Sizeof(border))
+	opacity := a.config.Appearance.WindowOpacity
+	if opacity <= 0 {
+		opacity = 96
+	}
+	style, _, _ := procGetWindowLongPtrW.Call(a.hwnd, windowLongIndex(GWL_EXSTYLE))
+	if opacity >= 100 {
+		procSetWindowLongPtrW.Call(a.hwnd, windowLongIndex(GWL_EXSTYLE), style&^WS_EX_LAYERED)
+	} else {
+		procSetWindowLongPtrW.Call(a.hwnd, windowLongIndex(GWL_EXSTYLE), style|WS_EX_LAYERED)
+		procSetLayeredWindowAttributes.Call(a.hwnd, 0, uintptr(opacity*255/100), LWA_ALPHA)
+	}
+	procInvalidateRect.Call(a.hwnd, 0, 0)
 }
 
 func (a *App) handleClick(x, y int32) {
@@ -438,6 +472,42 @@ func (a *App) runAction(action string, value int) {
 	case "toggle-gamefocus":
 		a.config.Gaming.GameFocus = !a.config.Gaming.GameFocus
 		a.saveAndRestart(false)
+	case "ai-connect":
+		key := strings.TrimSpace(readClipboardText())
+		if len(key) < 20 || !strings.HasPrefix(key, "sk-") {
+			a.ai.mu.Lock()
+			a.ai.Error = "Clipboard does not contain a recognizable OpenAI API key."
+			a.ai.mu.Unlock()
+		} else if err := saveKerneonCredential(key); err != nil {
+			a.ai.mu.Lock()
+			a.ai.Error = "Could not store the key in Windows Credential Manager: " + err.Error()
+			a.ai.mu.Unlock()
+		} else {
+			a.ai.mu.Lock()
+			a.ai.Connected = true
+			a.ai.mu.Unlock()
+			a.generateAIInsights()
+		}
+	case "ai-disconnect":
+		if err := deleteKerneonCredential(); err != nil {
+			a.logger.Error("ai-insights", "remove credential", err)
+		}
+		a.ai.mu.Lock()
+		a.ai.Connected = strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) != ""
+		a.ai.Insights, a.ai.Error, a.ai.Updated = nil, "", time.Time{}
+		a.ai.mu.Unlock()
+	case "ai-generate":
+		a.generateAIInsights()
+	case "opt-baseline":
+		a.captureOptimizationBaseline()
+	case "opt-apply":
+		a.applyPerformancePlan()
+	case "opt-compare":
+		a.compareOptimizationRun()
+	case "opt-rollback":
+		a.rollbackOptimization()
+	case "opt-keep":
+		a.keepOptimization()
 	case "network-hz":
 		vals := []int{10, 20, 30, 60, 90, 120}
 		a.config.Sampling.NetworkHz = cycleInt(vals, a.config.Sampling.NetworkHz, value)
@@ -450,11 +520,16 @@ func (a *App) runAction(action string, value int) {
 		vals := []int{30, 60, 120, 300}
 		a.config.Appearance.GraphSeconds = cycleInt(vals, a.config.Appearance.GraphSeconds, value)
 		a.saveAndRestart(false)
+	case "opacity":
+		vals := []int{92, 96, 100}
+		a.config.Appearance.WindowOpacity = cycleInt(vals, a.config.Appearance.WindowOpacity, value)
+		a.applyWindowMaterial()
+		a.saveAndRestart(false)
 	case "units":
 		vals := []core.UnitMode{core.UnitAuto, core.UnitBits, core.UnitBytes}
 		a.config.Network.Units = cycleMode(vals, a.config.Network.Units, value)
-		a.downFormatter.Mode = a.config.Network.Units
-		a.upFormatter.Mode = a.config.Network.Units
+		a.downFormatter.SetMode(a.config.Network.Units)
+		a.upFormatter.SetMode(a.config.Network.Units)
 		a.saveAndRestart(false)
 	case "ping":
 		vals := []int{0, 1, 2, 5, 10}
@@ -462,8 +537,10 @@ func (a *App) runAction(action string, value int) {
 		a.saveAndRestart(true)
 	case "defaults":
 		a.config = core.DefaultConfig()
-		a.downFormatter.Mode, a.upFormatter.Mode = a.config.Network.Units, a.config.Network.Units
+		a.downFormatter.SetMode(a.config.Network.Units)
+		a.upFormatter.SetMode(a.config.Network.Units)
 		a.applyTopMost()
+		a.applyWindowMaterial()
 		a.saveAndRestart(true)
 	case "compact":
 		a.toggleCompact()
@@ -561,6 +638,9 @@ func (a *App) shutdown() {
 		return
 	}
 	close(a.renderStop)
+	if a.optimizerSnapshot().Applied {
+		a.rollbackOptimization()
+	}
 	a.engine.Stop()
 	a.removeTrayIcon()
 	a.back.Destroy()
@@ -599,4 +679,31 @@ func copyText(value string) bool {
 	procGlobalUnlock.Call(h)
 	r, _, _ := procSetClipboardData.Call(13, h)
 	return r != 0
+}
+
+func readClipboardText() string {
+	if r, _, _ := procOpenClipboard.Call(0); r == 0 {
+		return ""
+	}
+	defer procCloseClipboard.Call()
+	h, _, _ := procGetClipboardData.Call(13)
+	if h == 0 {
+		return ""
+	}
+	p, _, _ := procGlobalLock.Call(h)
+	if p == 0 {
+		return ""
+	}
+	defer procGlobalUnlock.Call(h)
+	size, _, _ := procGlobalSize.Call(h)
+	if size < 2 {
+		return ""
+	}
+	units := make([]uint16, int(size/2))
+	procRtlMoveMemory.Call(uintptr(unsafe.Pointer(&units[0])), p, size)
+	end := 0
+	for end < len(units) && units[end] != 0 {
+		end++
+	}
+	return syscall.UTF16ToString(units[:end])
 }

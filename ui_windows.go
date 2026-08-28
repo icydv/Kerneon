@@ -258,7 +258,7 @@ func (a *App) drawShell(c *Canvas) {
 	items := []struct {
 		key, label string
 		color      uint32
-	}{{"overview", "Overview", palette.Cyan}, {"cpu", "CPU", palette.Blue}, {"gpu", "GPU", palette.Violet}, {"memory", "Memory", palette.Cyan}, {"storage", "Storage", palette.Amber}, {"network", "Network", palette.Green}, {"processes", "Processes", palette.Blue}, {"gaming", "Gaming", palette.Violet}, {"insights", "Insights", palette.Cyan}, {"history", "History", palette.Blue}, {"alerts", "Alerts", palette.Amber}, {"system", "System", palette.Muted}}
+	}{{"overview", "Overview", palette.Cyan}, {"cpu", "CPU", palette.Blue}, {"gpu", "GPU", palette.Violet}, {"memory", "Memory", palette.Cyan}, {"storage", "Storage", palette.Amber}, {"network", "Network", palette.Green}, {"processes", "Processes", palette.Blue}, {"gaming", "Gaming", palette.Violet}, {"insights", "Insights", palette.Cyan}, {"optimize", "Optimize", palette.Green}, {"history", "History", palette.Blue}, {"alerts", "Alerts", palette.Amber}, {"system", "System", palette.Muted}}
 	y := c.s(92)
 	itemH := c.s(36)
 	gap := c.s(2)
@@ -314,6 +314,8 @@ func (a *App) drawShell(c *Canvas) {
 		a.drawGaming(c, body)
 	case "insights":
 		a.drawInsights(c, body)
+	case "optimize":
+		a.drawOptimize(c, body)
 	case "history":
 		a.drawHistory(c, body)
 	case "alerts":
@@ -329,14 +331,18 @@ func (a *App) drawShell(c *Canvas) {
 
 func (a *App) drawBrand(c *Canvas, r RECT) {
 	cx, cy := r.Left+c.s(19), r.Top+c.s(24)
-	c.arc(cx, cy, c.s(12), 39, 321, palette.Text, 2)
+	c.arc(cx, cy, c.s(12), 100, 260, palette.Text, 2)
+	c.line(cx-c.s(1), cy, cx+c.s(10), cy-c.s(10), palette.Text, 2)
+	c.line(cx-c.s(1), cy, cx+c.s(10), cy+c.s(10), palette.Text, 2)
+	c.circle(cx+c.s(10), cy-c.s(10), c.s(1), palette.Text)
+	c.circle(cx+c.s(10), cy+c.s(10), c.s(1), palette.Text)
 	c.circle(cx, cy, c.s(2), palette.Blue)
 	c.text("Kerneon", RECT{r.Left + c.s(50), r.Top, r.Right, r.Top + c.s(31)}, 13, 680, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 	c.text("Understand your PC", RECT{r.Left + c.s(50), r.Top + c.s(27), r.Right, r.Top + c.s(48)}, 8, 500, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 }
 
 func (a *App) drawPageHeader(c *Canvas, r RECT) {
-	titles := map[string][2]string{"overview": {"Overview", "What your PC is doing right now"}, "cpu": {"CPU", "Processor load, clocks and system activity"}, "gpu": {"GPU", "Graphics engines and memory"}, "memory": {"Memory", "Physical and committed memory, explained"}, "storage": {"Storage", "Space and performance are different things"}, "network": {"Network", "Live throughput and connection quality"}, "processes": {"Processes", "Find what is consuming your PC"}, "gaming": {"Gaming", "Focused telemetry with Kerneon out of the way"}, "insights": {"Insights", "Factual observations from local telemetry"}, "history": {"History", "Synchronized resource timelines"}, "alerts": {"Alerts", "Sustained conditions, not noisy samples"}, "system": {"System", "Hardware and Windows at a glance"}, "settings": {"Settings", "Sampling, behavior and privacy"}}
+	titles := map[string][2]string{"overview": {"Overview", "What your PC is doing right now"}, "cpu": {"CPU", "Processor load, clocks and system activity"}, "gpu": {"GPU", "Graphics engines and memory"}, "memory": {"Memory", "Physical and committed memory, explained"}, "storage": {"Storage", "Space and performance are different things"}, "network": {"Network", "Live throughput and connection quality"}, "processes": {"Processes", "Find what is consuming your PC"}, "gaming": {"Gaming", "Focused telemetry with Kerneon out of the way"}, "insights": {"Insights", "Unique analysis grounded in your measured telemetry"}, "optimize": {"Optimize", "Change less, measure more, keep only proven gains"}, "history": {"History", "Synchronized resource timelines"}, "alerts": {"Alerts", "Sustained conditions, not noisy samples"}, "system": {"System", "Hardware and Windows at a glance"}, "settings": {"Settings", "Sampling, behavior and privacy"}}
 	t := titles[a.page]
 	if t[0] == "" {
 		t = titles["overview"]
@@ -357,12 +363,18 @@ func (a *App) drawOverview(c *Canvas, r RECT) {
 	} else if p.Severity > 1 {
 		col = palette.Amber
 	}
-	pressure := RECT{r.Left, r.Top, r.Right, r.Top + c.s(66)}
+	pressure := RECT{r.Left, r.Top, r.Right, r.Top + c.s(88)}
 	c.rounded(pressure, 14, palette.Surface)
 	c.strokeRound(pressure, 14, palette.Border, 1)
-	c.circle(pressure.Left+c.s(23), pressure.Top+c.s(25), c.s(5), col)
-	c.text(p.Title, RECT{pressure.Left + c.s(39), pressure.Top + c.s(10), pressure.Right - c.s(18), pressure.Top + c.s(32)}, 10, 650, col, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
-	c.text(p.Explanation, RECT{pressure.Left + c.s(39), pressure.Top + c.s(32), pressure.Right - c.s(18), pressure.Bottom - c.s(7)}, 9, 450, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	signatureW := min32(c.s(350), (pressure.Right-pressure.Left)*43/100)
+	signature := RECT{pressure.Right - signatureW, pressure.Top, pressure.Right, pressure.Bottom}
+	c.line(signature.Left, pressure.Top+c.s(14), signature.Left, pressure.Bottom-c.s(14), palette.Border, 1)
+	c.circle(pressure.Left+c.s(23), pressure.Top+c.s(34), c.s(5), col)
+	c.text("Live state", RECT{pressure.Left + c.s(39), pressure.Top + c.s(9), signature.Left - c.s(16), pressure.Top + c.s(29)}, 7, 650, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	c.text(p.Title, RECT{pressure.Left + c.s(39), pressure.Top + c.s(28), signature.Left - c.s(16), pressure.Top + c.s(52)}, 11, 660, col, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	c.text(p.Explanation, RECT{pressure.Left + c.s(39), pressure.Top + c.s(54), signature.Left - c.s(16), pressure.Bottom - c.s(7)}, 8, 450, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	a.drawLiveSignature(c, signature)
+	a.hit(signature, "nav:insights", 0)
 	y := pressure.Bottom + c.s(12)
 	gap := c.s(10)
 	cols := 3
@@ -383,6 +395,67 @@ func (a *App) drawOverview(c *Canvas, r RECT) {
 	if graph.Bottom-graph.Top > c.s(145) {
 		a.drawMultiGraph(c, graph, "System activity · Last "+durationLabel(a.config.Appearance.GraphSeconds), []graphSeries{{"CPU", palette.Blue, func(h HistorySample) float64 { return h.CPU }}, {"GPU", palette.Violet, func(h HistorySample) float64 { return h.GPU }}, {"Memory", palette.Cyan, func(h HistorySample) float64 { return h.Memory }}}, 100, "overview")
 	}
+}
+
+func (a *App) drawLiveSignature(c *Canvas, r RECT) {
+	caption, captionColor := a.signatureCaption()
+	c.text("Live signature", RECT{r.Left + c.s(16), r.Top + c.s(8), r.Right - c.s(16), r.Top + c.s(28)}, 7, 650, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	c.text(caption, RECT{r.Left + c.s(16), r.Top + c.s(25), r.Right - c.s(16), r.Top + c.s(45)}, 8, 600, captionColor, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	history := a.snapshot.History
+	if len(history) == 0 {
+		return
+	}
+	start := len(history) - 46
+	if start < 0 {
+		start = 0
+	}
+	history = history[start:]
+	plot := RECT{r.Left + c.s(16), r.Top + c.s(49), r.Right - c.s(16), r.Bottom - c.s(11)}
+	center := (plot.Top + plot.Bottom) / 2
+	c.line(plot.Left, center, plot.Right, center, palette.Grid, 1)
+	peakNetwork := math.Max(1, math.Max(a.snapshot.Network.PeakDown, a.snapshot.Network.PeakUp))
+	for i, sample := range history {
+		network := math.Max(sample.Down, sample.Up) / peakNetwork * 100
+		values := []float64{sample.CPU, sample.GPU, sample.Disk, network}
+		colors := []uint32{palette.Blue, palette.Violet, palette.Amber, palette.Green}
+		activity, color := values[0], colors[0]
+		for j := 1; j < len(values); j++ {
+			if values[j] > activity {
+				activity, color = values[j], colors[j]
+			}
+		}
+		activity = clampFloat(activity, 0, 100)
+		x := plot.Left
+		if len(history) > 1 {
+			x += int32(i) * (plot.Right - plot.Left) / int32(len(history)-1)
+		}
+		half := c.s(1) + int32(activity/100*float64(maxInt(1, int((plot.Bottom-plot.Top)/2-c.s(1)))))
+		c.line(x, center-half, x, center+half, blend(palette.Muted2, color, 0.72), 2)
+	}
+}
+
+func (a *App) signatureCaption() (string, uint32) {
+	items := []struct {
+		name  string
+		value float64
+		color uint32
+	}{
+		{"Processor is leading", a.display.CPU, palette.Blue},
+		{"Graphics is leading", a.display.GPU, palette.Violet},
+		{"Storage is leading", a.display.Disk, palette.Amber},
+		{"Network is leading", a.snapshot.Network.Utilization, palette.Green},
+		{"Memory pressure is leading", math.Max(0, (a.display.Memory-55)*2.2), palette.Cyan},
+	}
+	best := items[0]
+	for _, item := range items[1:] {
+		if item.value > best.value {
+			best = item
+		}
+	}
+	if best.value < 8 {
+		return "Quiet and balanced", palette.Green
+	}
+	return best.name, best.color
 }
 
 func (a *App) metricCard(c *Canvas, r RECT, title, value, sub string, color uint32, key string, current float64) {
@@ -490,7 +563,14 @@ func (a *App) drawMultiGraph(c *Canvas, r RECT, title string, series []graphSeri
 		yy := tip.Top + c.s(23)
 		for _, s := range series {
 			c.circle(tip.Left+c.s(11), yy+c.s(8), c.s(2), s.Color)
-			c.mono(fmt.Sprintf("%s  %.1f", s.Name, s.Value(closest)), RECT{tip.Left + c.s(20), yy, tip.Right - c.s(8), yy + c.s(16)}, 7, 500, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+			value := s.Value(closest)
+			label := fmt.Sprintf("%.1f", value)
+			if key == "network" || key == "hist3" {
+				label = core.FormatRate(value, a.config.Network.Units)
+			} else if fixedMax == 100 {
+				label = fmt.Sprintf("%.1f%%", value)
+			}
+			c.mono(s.Name+"  "+label, RECT{tip.Left + c.s(20), yy, tip.Right - c.s(8), yy + c.s(16)}, 7, 500, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
 			yy += c.s(17)
 		}
 	}
@@ -593,7 +673,7 @@ func (a *App) drawNetwork(c *Canvas, r RECT) {
 	topH := c.s(96)
 	w := (r.Right - r.Left - gap*3) / 4
 	now := time.Now()
-	cards := []stat{{"Download", a.downFormatter.Format(a.display.Down, now), "Peak " + a.downFormatter.Format(a.snapshot.Network.PeakDown, now)}, {"Upload", a.upFormatter.Format(a.display.Up, now), "Peak " + a.upFormatter.Format(a.snapshot.Network.PeakUp, now)}, {"Latency", latencyLabel(a.snapshot.Network), fmt.Sprintf("%.1f ms jitter · %.0f%% loss", a.snapshot.Network.JitterMs, a.snapshot.Network.PacketLoss)}, {"Link load", fmt.Sprintf("%.2f%%", a.snapshot.Network.Utilization), linkLabel(a.snapshot.Network.LinkDown)}}
+	cards := []stat{{"Download", a.downFormatter.Format(a.display.Down, now), "Peak " + core.FormatRate(a.snapshot.Network.PeakDown, a.config.Network.Units)}, {"Upload", a.upFormatter.Format(a.display.Up, now), "Peak " + core.FormatRate(a.snapshot.Network.PeakUp, a.config.Network.Units)}, {"Latency", latencyLabel(a.snapshot.Network), fmt.Sprintf("%.1f ms jitter · %.0f%% loss", a.snapshot.Network.JitterMs, a.snapshot.Network.PacketLoss)}, {"Link load", fmt.Sprintf("%.2f%%", a.snapshot.Network.Utilization), linkLabel(a.snapshot.Network.LinkDown)}}
 	for i, s := range cards {
 		cr := RECT{r.Left + int32(i)*(w+gap), r.Top, r.Left + int32(i)*(w+gap) + w, r.Top + topH}
 		c.rounded(cr, 13, palette.Card)
@@ -857,31 +937,252 @@ func (a *App) drawGaming(c *Canvas, r RECT) {
 }
 
 func (a *App) drawInsights(c *Canvas, r RECT) {
-	pressure := core.ExplainPressure(core.PressureInput{CPU: a.display.CPU, GPU: a.display.GPU, Memory: a.display.Memory, Disk: a.display.Disk, Latency: a.display.Latency, PacketLoss: a.snapshot.Network.PacketLoss})
-	items := []Event{{time.Now(), "pressure", pressure.Title, pressure.Explanation, pressure.Severity}, {time.Now(), "memory", "Memory has comfortable reclaimable capacity", fmt.Sprintf("%s is available; cached memory remains reusable by applications.", core.FormatBytes(a.snapshot.Memory.Available)), 0}, {time.Now(), "network", "Connection quality snapshot", fmt.Sprintf("Latency %.0f ms, jitter %.1f ms and recent loss %.0f%%.", a.snapshot.Network.LatencyMs, a.snapshot.Network.JitterMs, a.snapshot.Network.PacketLoss), func() int {
-		if a.snapshot.Network.PacketLoss >= 3 {
-			return 2
-		}
-		return 0
-	}()}}
-	if len(a.snapshot.Processes) > 0 {
-		p := a.snapshot.Processes[0]
-		items = append(items, Event{time.Now(), "process", "Top consumer: " + p.Name, fmt.Sprintf("%.1f%% CPU, %s RAM and %s/s disk activity.", p.CPU, core.FormatBytes(p.WorkingSet), shortBytes(p.ReadBps+p.WriteBps)), 0})
+	a.ai.mu.RLock()
+	connected, loading, aiErr, updated := a.ai.Connected, a.ai.Loading, a.ai.Error, a.ai.Updated
+	generated := append([]AIInsight(nil), a.ai.Insights...)
+	a.ai.mu.RUnlock()
+
+	hero := RECT{r.Left, r.Top, r.Right, r.Top + c.s(116)}
+	c.rounded(hero, 15, palette.Surface)
+	c.strokeRound(hero, 15, palette.Border, 1)
+	c.text("KERNEON INTELLIGENCE", RECT{hero.Left + c.s(20), hero.Top + c.s(12), hero.Right - c.s(390), hero.Top + c.s(35)}, 8, 700, palette.Cyan, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	status := "LOCAL · PRIVATE"
+	statusColor := palette.Green
+	if connected {
+		status = "AI CONNECTED"
+		statusColor = palette.Cyan
 	}
-	y := r.Top
-	for _, it := range items {
-		h := c.s(92)
-		box := RECT{r.Left, y, r.Right, y + h}
+	if loading {
+		status = "ANALYSING TELEMETRY…"
+	} else if connected && !updated.IsZero() {
+		status = "AI · UPDATED " + updated.Format("15:04")
+	}
+	statusR := RECT{hero.Right - c.s(190), hero.Top + c.s(14), hero.Right - c.s(20), hero.Top + c.s(40)}
+	c.rounded(statusR, 14, palette.CardHover)
+	c.text(status, statusR, 7, 700, statusColor, DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	description := "Local analysis is always available. Optional AI sends only resource measurements and anonymized process metrics when you request it; it cannot control this PC."
+	if connected {
+		description = "GPT-5.4 Mini turns the current and last 60 seconds of anonymized telemetry into situation-specific observations. Requests are stateless; API usage is billed to your key."
+	}
+	c.text(description, RECT{hero.Left + c.s(20), hero.Top + c.s(42), hero.Right - c.s(320), hero.Bottom - c.s(14)}, 8, 450, palette.Muted, DT_LEFT|DT_WORDBREAK)
+	if connected {
+		generate := RECT{hero.Right - c.s(286), hero.Top + c.s(58), hero.Right - c.s(130), hero.Top + c.s(98)}
+		a.button(c, generate, func() string {
+			if loading {
+				return "Analysing…"
+			}
+			return "Generate insights"
+		}(), "ai-generate", 0, true)
+		disconnect := RECT{hero.Right - c.s(120), hero.Top + c.s(58), hero.Right - c.s(20), hero.Top + c.s(98)}
+		a.button(c, disconnect, "Disconnect", "ai-disconnect", 0, false)
+	} else {
+		connect := RECT{hero.Right - c.s(286), hero.Top + c.s(58), hero.Right - c.s(20), hero.Top + c.s(98)}
+		a.button(c, connect, "Connect copied API key", "ai-connect", 0, false)
+	}
+	if aiErr != "" {
+		c.text(aiErr, RECT{hero.Left + c.s(20), hero.Bottom - c.s(28), hero.Right - c.s(320), hero.Bottom - c.s(6)}, 7, 550, palette.Amber, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	}
+
+	type insightCard struct {
+		title, detail, evidence, next string
+		severity                      int
+		source                        string
+	}
+	cards := make([]insightCard, 0, 4)
+	for _, item := range generated {
+		cards = append(cards, insightCard{item.Title, item.Explanation, strings.Join(item.Evidence, " · "), item.NextStep, 0, "AI · " + strings.ToUpper(item.Confidence) + " CONFIDENCE"})
+		if len(cards) == 4 {
+			break
+		}
+	}
+	if len(cards) == 0 {
+		pressure := core.ExplainPressure(core.PressureInput{CPU: a.display.CPU, GPU: a.display.GPU, Memory: a.display.Memory, Disk: a.display.Disk, Latency: a.display.Latency, PacketLoss: a.snapshot.Network.PacketLoss})
+		cards = append(cards,
+			insightCard{pressure.Title, pressure.Explanation, fmt.Sprintf("CPU %.0f%% · GPU %.0f%% · memory %.0f%% · disk %.0f%%", a.display.CPU, a.display.GPU, a.display.Memory, a.display.Disk), "Watch the synchronized History view to confirm whether the condition is sustained.", pressure.Severity, "LOCAL ANALYSIS"},
+			insightCard{"Memory capacity", fmt.Sprintf("%s remains available. Cached memory is reusable and is not treated as wasted capacity.", core.FormatBytes(a.snapshot.Memory.Available)), fmt.Sprintf("Physical memory %.1f%% used", a.display.Memory), "Investigate only if pressure is sustained or paging accompanies stutter.", 0, "LOCAL ANALYSIS"},
+			insightCard{"Connection quality", "Latency, jitter and loss are reported separately so bandwidth is not confused with responsiveness.", fmt.Sprintf("%.0f ms latency · %.1f ms jitter · %.0f%% loss", a.snapshot.Network.LatencyMs, a.snapshot.Network.JitterMs, a.snapshot.Network.PacketLoss), "Repeat against the same target before attributing a change to the network.", func() int {
+				if a.snapshot.Network.PacketLoss >= 3 {
+					return 2
+				}
+				return 0
+			}(), "LOCAL ANALYSIS"})
+		if len(a.snapshot.Processes) > 0 {
+			p := a.snapshot.Processes[0]
+			cards = append(cards, insightCard{"Top measured consumer: " + p.Name, "This is an observation, not proof that the process is causing a slowdown.", fmt.Sprintf("%.1f%% CPU · %s RAM · %s/s disk", p.CPU, core.FormatBytes(p.WorkingSet), shortBytes(p.ReadBps+p.WriteBps)), "Open Processes to inspect its path and activity before taking action.", 0, "LOCAL ANALYSIS"})
+		}
+	}
+	y := hero.Bottom + c.s(11)
+	available := r.Bottom - y - c.s(int32(maxInt(0, len(cards)-1))*9)
+	h := available / int32(maxInt(1, len(cards)))
+	if h > c.s(128) {
+		h = c.s(128)
+	}
+	if h < c.s(92) {
+		h = c.s(92)
+	}
+	for _, item := range cards {
+		box := RECT{r.Left, y, r.Right, min32(r.Bottom, y+h)}
 		c.rounded(box, 13, palette.Card)
 		c.strokeRound(box, 13, palette.Border, 1)
 		col := palette.Cyan
-		if it.Severity > 1 {
+		if item.severity > 1 {
 			col = palette.Amber
 		}
 		c.circle(box.Left+c.s(22), box.Top+c.s(25), c.s(4), col)
-		c.text(strings.ToUpper(it.Title), RECT{box.Left + c.s(38), box.Top + c.s(11), box.Right - c.s(18), box.Top + c.s(38)}, 9, 700, col, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
-		c.text(it.Detail, RECT{box.Left + c.s(38), box.Top + c.s(39), box.Right - c.s(18), box.Bottom - c.s(10)}, 9, 450, palette.Muted, DT_LEFT|DT_WORDBREAK)
-		y += h + c.s(10)
+		c.text(item.source, RECT{box.Left + c.s(38), box.Top + c.s(7), box.Right - c.s(18), box.Top + c.s(27)}, 7, 700, col, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+		c.text(item.title, RECT{box.Left + c.s(38), box.Top + c.s(27), box.Right - c.s(18), box.Top + c.s(51)}, 10, 680, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		c.text(item.detail, RECT{box.Left + c.s(38), box.Top + c.s(52), box.Right - c.s(18), box.Top + c.s(81)}, 8, 450, palette.Muted, DT_LEFT|DT_WORDBREAK|DT_END_ELLIPSIS)
+		c.text("EVIDENCE  "+item.evidence, RECT{box.Left + c.s(38), box.Top + c.s(82), box.Right - c.s(18), box.Top + c.s(102)}, 7, 600, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		if box.Bottom-box.Top >= c.s(118) {
+			c.text("NEXT  "+item.next, RECT{box.Left + c.s(38), box.Top + c.s(103), box.Right - c.s(18), box.Bottom - c.s(5)}, 7, 550, palette.Green, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		}
+		y = box.Bottom + c.s(9)
+		if y >= r.Bottom {
+			break
+		}
+	}
+}
+
+func (a *App) drawOptimize(c *Canvas, r RECT) {
+	view := a.optimizerSnapshot()
+	topProcess := ProcessMetric{}
+	if len(a.snapshot.Processes) > 0 {
+		topProcess = a.snapshot.Processes[0]
+	}
+	findings := core.AnalyzeOptimizations(core.OptimizationInput{CPU: a.display.CPU, GPU: a.display.GPU, Memory: a.display.Memory, Disk: a.display.Disk, Latency: a.display.Latency, PacketLoss: a.snapshot.Network.PacketLoss, CPUFrequencyMHz: a.snapshot.CPU.FrequencyMHz, CPUMaxMHz: a.snapshot.CPU.MaxMHz, TopProcess: topProcess.Name, TopProcessCPU: topProcess.CPU, GameFocus: a.config.Gaming.GameFocus, PowerPlan: view.PowerPlan})
+	powerEligible := false
+	for _, finding := range findings {
+		if finding.Key == "power-plan" && finding.Actionable {
+			powerEligible = true
+		}
+	}
+	planName := strings.ToLower(view.PowerPlan)
+	baselineEligible := view.Baseline.Samples >= 10 && view.Baseline.CPU >= 70 && (view.Baseline.GPU < 90 || view.Baseline.CPU > view.Baseline.GPU+8)
+	if baselineEligible && !strings.Contains(planName, "performance") && !strings.Contains(planName, "ultimate") && !strings.Contains(planName, "ultra") {
+		powerEligible = true
+	}
+
+	hero := RECT{r.Left, r.Top, r.Right, r.Top + c.s(104)}
+	c.rounded(hero, 15, palette.Surface)
+	c.strokeRound(hero, 15, palette.Border, 1)
+	c.text("PROOF BEFORE PROMISES", RECT{hero.Left + c.s(20), hero.Top + c.s(12), hero.Right - c.s(20), hero.Top + c.s(34)}, 8, 700, palette.Green, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	c.text("Kerneon changes one variable at a time, preserves rollback, and compares synchronized telemetry from a repeatable workload.", RECT{hero.Left + c.s(20), hero.Top + c.s(37), hero.Right - c.s(300), hero.Bottom - c.s(12)}, 11, 580, palette.Text, DT_LEFT|DT_WORDBREAK)
+	badge := RECT{hero.Right - c.s(260), hero.Top + c.s(31), hero.Right - c.s(20), hero.Top + c.s(70)}
+	c.rounded(badge, 20, palette.CardHover)
+	badgeText := "NO SYSTEM CHANGE PENDING"
+	badgeCol := palette.Green
+	if view.Applied {
+		badgeText, badgeCol = "EXPERIMENT ACTIVE · ROLLBACK READY", palette.Amber
+	}
+	c.text(badgeText, badge, 7, 700, badgeCol, DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+
+	bodyTop := hero.Bottom + c.s(11)
+	gap := c.s(11)
+	left := RECT{r.Left, bodyTop, r.Left + (r.Right-r.Left)*55/100, r.Bottom}
+	right := RECT{left.Right + gap, bodyTop, r.Right, r.Bottom}
+	c.text("MEASURED DIAGNOSIS", RECT{left.Left, left.Top, left.Right, left.Top + c.s(24)}, 8, 700, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	y := left.Top + c.s(30)
+	for i, finding := range findings {
+		if i >= 4 || y+c.s(107) > left.Bottom {
+			break
+		}
+		box := RECT{left.Left, y, left.Right, y + c.s(101)}
+		c.rounded(box, 13, palette.Card)
+		c.strokeRound(box, 13, palette.Border, 1)
+		col := palette.Cyan
+		if finding.Severity > 1 {
+			col = palette.Amber
+		}
+		c.circle(box.Left+c.s(20), box.Top+c.s(24), c.s(4), col)
+		c.text(finding.Title, RECT{box.Left + c.s(34), box.Top + c.s(9), box.Right - c.s(12), box.Top + c.s(35)}, 9, 680, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		c.text(finding.Detail, RECT{box.Left + c.s(34), box.Top + c.s(36), box.Right - c.s(12), box.Top + c.s(66)}, 7, 450, palette.Muted, DT_LEFT|DT_WORDBREAK|DT_END_ELLIPSIS)
+		c.text("EVIDENCE  "+finding.Evidence, RECT{box.Left + c.s(34), box.Top + c.s(68), box.Right - c.s(12), box.Bottom - c.s(8)}, 7, 600, col, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		y = box.Bottom + c.s(8)
+	}
+	if left.Bottom-y >= c.s(150) {
+		trust := RECT{left.Left, y, left.Right, min32(left.Bottom, y+c.s(205))}
+		c.rounded(trust, 13, palette.Surface)
+		c.strokeRound(trust, 13, palette.Border, 1)
+		c.text("SHORTCUTS KERNEON REJECTS", RECT{trust.Left + c.s(18), trust.Top + c.s(10), trust.Right - c.s(18), trust.Top + c.s(34)}, 8, 700, palette.Green, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+		rejected := []struct{ title, why string }{{"Memory cleaners", "Discard useful cache; they do not add RAM."}, {"Blanket service disabling", "Trades stability for an unproven background delta."}, {"Generic registry gaming tweaks", "No controlled evidence, no safe universal gain."}}
+		ry := trust.Top + c.s(41)
+		for _, item := range rejected {
+			c.circle(trust.Left+c.s(21), ry+c.s(11), c.s(3), palette.Muted2)
+			c.text(item.title, RECT{trust.Left + c.s(34), ry, trust.Left + c.s(240), ry + c.s(23)}, 8, 650, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+			c.text(item.why, RECT{trust.Left + c.s(248), ry, trust.Right - c.s(14), ry + c.s(23)}, 7, 450, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+			ry += c.s(43)
+		}
+	}
+
+	c.text("CONTROLLED EXPERIMENT", RECT{right.Left, right.Top, right.Right, right.Top + c.s(24)}, 8, 700, palette.Muted2, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	panel := RECT{right.Left, right.Top + c.s(30), right.Right, right.Bottom}
+	c.rounded(panel, 14, palette.Card)
+	c.strokeRound(panel, 14, palette.Border, 1)
+	c.text("Windows power profile", RECT{panel.Left + c.s(18), panel.Top + c.s(12), panel.Right - c.s(18), panel.Top + c.s(38)}, 12, 680, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+	plan := fallback(view.PowerPlan, "Reading active plan…")
+	c.text("CURRENT  "+strings.ToUpper(plan), RECT{panel.Left + c.s(18), panel.Top + c.s(40), panel.Right - c.s(18), panel.Top + c.s(62)}, 7, 700, palette.Cyan, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+	experimentText := "The evidence gate is closed. Load a repeatable CPU-heavy scene before Kerneon will offer a power change; performance-oriented plans are never replaced with the generic Windows plan."
+	if powerEligible {
+		experimentText = "The current signal is CPU-heavy. High performance can reduce clock ramp latency on some hardware; it is not assumed to increase FPS."
+	}
+	c.text(experimentText, RECT{panel.Left + c.s(18), panel.Top + c.s(68), panel.Right - c.s(18), panel.Top + c.s(117)}, 8, 450, palette.Muted, DT_LEFT|DT_WORDBREAK)
+	stepY := panel.Top + c.s(128)
+	drawStep := func(n int, title, sub string, done bool) {
+		col := palette.Muted2
+		if done {
+			col = palette.Green
+		}
+		c.circle(panel.Left+c.s(27), stepY+c.s(16), c.s(11), col)
+		c.text(fmt.Sprint(n), RECT{panel.Left + c.s(16), stepY + c.s(5), panel.Left + c.s(38), stepY + c.s(27)}, 7, 700, palette.BG, DT_CENTER|DT_VCENTER|DT_SINGLELINE)
+		c.text(title, RECT{panel.Left + c.s(48), stepY, panel.Right - c.s(18), stepY + c.s(25)}, 9, 650, palette.Text, DT_LEFT|DT_VCENTER|DT_SINGLELINE)
+		c.text(sub, RECT{panel.Left + c.s(48), stepY + c.s(24), panel.Right - c.s(18), stepY + c.s(45)}, 7, 450, palette.Muted, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
+		stepY += c.s(52)
+	}
+	drawStep(1, "Capture the baseline", func() string {
+		if view.Baseline.Samples > 0 {
+			return fmt.Sprintf("%d samples · CPU %.0f%% · GPU %.0f%%", view.Baseline.Samples, view.Baseline.CPU, view.Baseline.GPU)
+		}
+		return "Play a representative scene, then capture the last 60 seconds"
+	}(), view.Baseline.Samples >= 10)
+	drawStep(2, "Apply one reversible change", func() string {
+		if view.Applied {
+			return "High performance active; previous plan: " + view.PreviousPlan
+		}
+		if !powerEligible {
+			return "Not offered: the current evidence or active plan does not justify it"
+		}
+		if !view.HighPerformanceExists {
+			return "High performance is not exposed by this Windows device"
+		}
+		return "Switch from " + plan + " to High performance"
+	}(), view.Applied)
+	drawStep(3, "Repeat and compare", func() string {
+		if view.Comparison.Verdict != "" {
+			return view.Comparison.Verdict + " · " + view.Comparison.Detail
+		}
+		if view.Applied {
+			return "Repeat the same scene for at least 10 synchronized samples"
+		}
+		return "No score is produced until both runs contain enough evidence"
+	}(), view.Comparison.Verdict == "Measured improvement")
+
+	buttonY := panel.Bottom - c.s(94)
+	bw := (panel.Right - panel.Left - c.s(54)) / 3
+	a.button(c, RECT{panel.Left + c.s(18), buttonY, panel.Left + c.s(18) + bw, buttonY + c.s(38)}, "Capture baseline", "opt-baseline", 0, view.Baseline.Samples >= 10)
+	applyAction, applyLabel := "opt-apply", "Apply + test"
+	if !powerEligible && !view.Applied {
+		applyAction, applyLabel = "", "Gate closed"
+	}
+	a.button(c, RECT{panel.Left + c.s(27) + bw, buttonY, panel.Left + c.s(27) + 2*bw, buttonY + c.s(38)}, applyLabel, applyAction, 0, view.Applied)
+	a.button(c, RECT{panel.Left + c.s(36) + 2*bw, buttonY, panel.Right - c.s(18), buttonY + c.s(38)}, "Compare", "opt-compare", 0, view.Comparison.Verdict != "")
+	if view.Applied {
+		a.button(c, RECT{panel.Left + c.s(18), panel.Bottom - c.s(46), panel.Left + (panel.Right-panel.Left)/2 - c.s(4), panel.Bottom - c.s(10)}, "Rollback now", "opt-rollback", 0, false)
+		if view.Comparison.Verdict == "Measured improvement" {
+			a.button(c, RECT{panel.Left + (panel.Right-panel.Left)/2 + c.s(4), panel.Bottom - c.s(46), panel.Right - c.s(18), panel.Bottom - c.s(10)}, "Keep verified change", "opt-keep", 0, true)
+		}
+	}
+	if view.Error != "" {
+		c.text(view.Error, RECT{panel.Left + c.s(18), buttonY - c.s(30), panel.Right - c.s(18), buttonY - c.s(5)}, 7, 600, palette.Amber, DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS)
 	}
 }
 
@@ -957,6 +1258,8 @@ func (a *App) drawSettings(c *Canvas, r RECT) {
 	y += c.s(88)
 	units := map[core.UnitMode]string{core.UnitAuto: "Auto", core.UnitBits: "Bits/sec", core.UnitBytes: "Bytes/sec"}[a.config.Network.Units]
 	a.settingChoice(c, RECT{left.Left, y, left.Right, y + c.s(78)}, "Throughput units", "Auto uses hysteresis to avoid unit flicker", units, "units")
+	y += c.s(88)
+	a.settingChoice(c, RECT{left.Left, y, left.Right, y + c.s(78)}, "Window material", "Mica backdrop with restrained whole-window translucency", fmt.Sprintf("%d%%", a.config.Appearance.WindowOpacity), "opacity")
 	y += c.s(88)
 	a.settingChoice(c, RECT{left.Left, y, left.Right, y + c.s(78)}, "Ping cadence", "Runs independently from bandwidth sampling", func() string {
 		if a.config.Network.PingSeconds == 0 {

@@ -2,7 +2,7 @@
 
 Kerneon is a portable, native Windows performance monitor designed to explain what a PC is doing without turning the answer into a wall of counters. It is a ground-up replacement for the PulseNet 1.0 prototype.
 
-The application presents synchronized CPU, GPU, memory, storage, network, process, latency, system, event, and recent-history views. It is local-first: no account, cloud service, installer, background service, driver, code injection, or administrator access is required.
+The application presents synchronized CPU, GPU, memory, storage, network, process, latency, system, event, and recent-history views. It is local-first: no account, installer, background service, driver, code injection, or administrator access is required. Optional AI insights are generated only on request with a user-supplied OpenAI API key.
 
 ## Run
 
@@ -19,7 +19,9 @@ Settings are stored atomically under `%APPDATA%\Kerneon\settings.json`. Logs and
 - Adaptive minimized/tray behavior: 1 FPS rendering, 10 Hz network sampling, 1 s CPU sampling, and 5 s process sampling.
 - Game Focus detects a true full-monitor foreground window, suspends invisible high-rate rendering, and defers metadata scans without injecting into the game.
 - Overview pressure explanation, synchronized graph crosshairs, 60-second incident capture, process list/map/detail, compact view, alerts/events, system summary, and sanitized diagnostics.
-- Per-monitor-v2 DPI awareness, dark title bar, rounded Windows 11 frame, double-buffered GDI rendering, tray lifecycle, and embedded version/icon resources.
+- Evidence-grounded local Insights plus optional GPT-5.4 Mini analysis of a stateless, identity-free telemetry digest.
+- An Optimize workspace that captures a baseline, gates changes on a measured CPU limit, applies one reversible Windows power-plan experiment, compares a repeat run, and keeps a change only after a measured improvement.
+- Per-monitor-v2 DPI awareness, a Windows 11 Mica backdrop, selectable restrained window opacity, 60 FPS display smoothing, rounded native surfaces, double-buffered GDI rendering, tray lifecycle, and embedded version/icon resources.
 
 ## Build and test
 
@@ -49,8 +51,10 @@ The build has no third-party runtime Go modules. See `THIRD_PARTY_NOTICES.md`, `
 
 ## Safety and privacy
 
-Kerneon is read-only in 1.0.0. It does not terminate processes, change priority or affinity, modify services, alter power plans, clear memory, install drivers, inject overlays, or apply registry tweaks. It makes ICMP echo requests only to the configured ping target when latency monitoring is enabled. No telemetry is uploaded.
+Telemetry stays local by default. AI analysis is opt-in per request; Kerneon sends resource measurements and anonymized process labels, never process names, paths, hostnames, adapter names, or IP addresses. Requests use the OpenAI Responses API with `store: false`. The optional API key is stored by Windows Credential Manager, not in Kerneon's settings file.
+
+Kerneon does not terminate processes, change priority or affinity, modify services, clear memory, install drivers, inject overlays, or apply registry tweaks. Optimize can change the active Windows power plan only after an explicit click and eligible baseline. It journals the previous plan, exposes immediate rollback, restores an interrupted experiment at next startup, and automatically rolls back a pending experiment on normal exit. A result is retained only when the repeat run passes the evidence checks.
 
 ## Scope
 
-Kerneon 1.0.0 deliberately labels unavailable data instead of inventing it. Frame-presentation statistics, temperatures, fan/power sensors, persistent history, per-process network/GPU attribution, custom notifications, and privileged process actions are not claimed. The detailed list is in `docs\KNOWN_LIMITATIONS.md`.
+Kerneon 1.0.0 deliberately labels unavailable data instead of inventing it. Frame-presentation statistics, temperatures, fan/power sensors, persistent history, per-process network/GPU attribution, custom notifications, and privileged process actions are not claimed. AI insight generation requires API connectivity and separate OpenAI API billing; a bundled commercial AI service is not included in this portable build. The detailed list is in `docs\KNOWN_LIMITATIONS.md`.

@@ -39,6 +39,7 @@ type Config struct {
 	Appearance struct {
 		ReducedMotion bool `json:"reduced_motion"`
 		GraphSeconds  int  `json:"graph_seconds"`
+		WindowOpacity int  `json:"window_opacity"`
 	} `json:"appearance"`
 	History struct {
 		Enabled          bool `json:"enabled"`
@@ -47,6 +48,9 @@ type Config struct {
 	Gaming struct {
 		GameFocus bool `json:"game_focus"`
 	} `json:"gaming"`
+	Tuning struct {
+		PendingPowerPlan string `json:"pending_power_plan,omitempty"`
+	} `json:"tuning"`
 }
 
 func DefaultConfig() Config {
@@ -56,10 +60,11 @@ func DefaultConfig() Config {
 	c.Window.X, c.Window.Y = -1, -1
 	c.Window.LastPage = "overview"
 	c.Window.CloseToTray = true
-	c.Sampling = SamplingConfig{NetworkHz: 60, GraphFPS: 30, CPUms: 500, Processms: 1500, SensorSec: 5, Adaptive: true}
+	c.Sampling = SamplingConfig{NetworkHz: 60, GraphFPS: 60, CPUms: 500, Processms: 1500, SensorSec: 5, Adaptive: true}
 	c.Network.Units = UnitAuto
 	c.Network.PingTarget, c.Network.PingSeconds = "1.1.1.1", 2
 	c.Appearance.GraphSeconds = 60
+	c.Appearance.WindowOpacity = 96
 	c.History.Enabled, c.History.RetentionMinutes = true, 60
 	c.Gaming.GameFocus = true
 	return c
@@ -128,14 +133,14 @@ func ValidateConfig(c *Config) {
 	c.Version = ConfigVersion
 	c.Window.Width = clamp(c.Window.Width, 960, 5120)
 	c.Window.Height = clamp(c.Window.Height, 640, 2880)
-	if !oneOf(c.Window.LastPage, "overview", "cpu", "gpu", "memory", "storage", "network", "processes", "gaming", "insights", "history", "alerts", "system", "settings") {
+	if !oneOf(c.Window.LastPage, "overview", "cpu", "gpu", "memory", "storage", "network", "processes", "gaming", "insights", "optimize", "history", "alerts", "system", "settings") {
 		c.Window.LastPage = "overview"
 	}
 	if !oneOfInt(c.Sampling.NetworkHz, 10, 20, 30, 60, 90, 120) {
 		c.Sampling.NetworkHz = 60
 	}
 	if !oneOfInt(c.Sampling.GraphFPS, 30, 60, 120) {
-		c.Sampling.GraphFPS = 30
+		c.Sampling.GraphFPS = 60
 	}
 	c.Sampling.CPUms = clamp(c.Sampling.CPUms, 200, 2000)
 	c.Sampling.Processms = clamp(c.Sampling.Processms, 500, 10000)
@@ -151,6 +156,9 @@ func ValidateConfig(c *Config) {
 	}
 	if !oneOfInt(c.Appearance.GraphSeconds, 30, 60, 120, 300) {
 		c.Appearance.GraphSeconds = 60
+	}
+	if !oneOfInt(c.Appearance.WindowOpacity, 92, 96, 100) {
+		c.Appearance.WindowOpacity = 96
 	}
 	c.History.RetentionMinutes = clamp(c.History.RetentionMinutes, 5, 10080)
 }

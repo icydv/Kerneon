@@ -1,6 +1,5 @@
-// Command icon renders Kerneon's deliberately simple core mark using only the
-// Go standard library. Keeping the source geometric makes every release icon
-// reproducible and avoids baking a generated illustration into the product.
+// Command icon renders Kerneon's pressure-arc monogram using only the Go
+// standard library. The geometry stays reproducible at every release size.
 package main
 
 import (
@@ -32,8 +31,11 @@ func main() {
 			case distance <= 218*scale:
 				pixel = color.NRGBA{R: 20, G: 21, B: 24, A: 255}
 			}
-			// The gap is intentional: it keeps the core open, not button-like.
-			if math.Abs(distance-142*scale) <= 15*scale && angle >= 28 && angle <= 332 {
+			// A pressure arc plus two rays forms a restrained, asymmetric K.
+			if math.Abs(distance-142*scale) <= 15*scale && angle >= 100 && angle <= 260 {
+				pixel = color.NRGBA{R: 232, G: 234, B: 239, A: 255}
+			}
+			if segmentDistance(dx, dy, -8*scale, 0, 118*scale, -112*scale) <= 15*scale || segmentDistance(dx, dy, -8*scale, 0, 118*scale, 112*scale) <= 15*scale {
 				pixel = color.NRGBA{R: 232, G: 234, B: 239, A: 255}
 			}
 			if distance <= 18*scale {
@@ -67,4 +69,18 @@ func main() {
 	if err := png.Encode(file, out); err != nil {
 		panic(err)
 	}
+}
+
+func segmentDistance(px, py, ax, ay, bx, by float64) float64 {
+	dx, dy := bx-ax, by-ay
+	if dx == 0 && dy == 0 {
+		return math.Hypot(px-ax, py-ay)
+	}
+	t := ((px-ax)*dx + (py-ay)*dy) / (dx*dx + dy*dy)
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	return math.Hypot(px-(ax+t*dx), py-(ay+t*dy))
 }

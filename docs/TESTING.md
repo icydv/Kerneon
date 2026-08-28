@@ -6,11 +6,11 @@ Run all checks from a PowerShell prompt:
 .\scripts\test.ps1
 ```
 
-The suite currently contains 24 named tests: 19 deterministic core tests and five Windows/application integration tests.
+The suite currently contains 30 named tests: 23 deterministic core tests and seven Windows/application integration tests.
 
-Core coverage includes elapsed-time rates, zero/tiny intervals, counter reset/wrap behavior, time-aware EMA, rolling average, ring ordering/capacity, unit conversion and hysteresis, graph scale decay, timestamp mapping, aggregation, malformed/versioned settings, validation, PulseNet migration, alert hysteresis/cooldown, provider failure isolation, process lifetime, and human pressure explanation.
+Core coverage includes elapsed-time rates, zero/tiny intervals, counter reset/wrap behavior, time-aware EMA, rolling average, ring ordering/capacity, immediate rate-unit initialization, live/peak formatter isolation, unit conversion and hysteresis, graph scale decay, timestamp mapping, aggregation, malformed/versioned settings, validation, PulseNet migration, alert hysteresis/cooldown, provider failure isolation, process lifetime, human pressure explanation, optimizer eligibility, workload comparability, and proof verdicts.
 
-Windows/application integration coverage validates native memory/system counts, CPU topology, fixed volumes, interface enumeration, process enumeration, PDH fail-soft behavior, a real 120 Hz network run, adaptive reduction toward 10 Hz, atomic settings round-trip, and malformed-file preservation. `go vet ./...` must complete without warnings.
+Windows/application integration coverage validates native memory/system counts, CPU topology, fixed volumes, interface enumeration, process enumeration, PDH fail-soft behavior, a real 120 Hz network run, adaptive reduction toward 10 Hz, atomic settings round-trip, malformed-file preservation, AI telemetry identity removal, and a mocked stateless Structured Outputs request. Tests never call the live OpenAI API or change the Windows power plan. `go vet ./...` must complete without warnings.
 
 ## Manual UI checklist
 
@@ -24,6 +24,8 @@ Windows/application integration coverage validates native memory/system counts, 
 - Cycle each settings choice, restart, and confirm persistence.
 - Corrupt a disposable settings copy and confirm preservation/default recovery.
 - Confirm GPU/disk/latency unavailable states are honest with the provider disabled or disconnected.
+- Confirm Insights remains useful without AI; connect a disposable copied API key, generate, verify source/confidence/evidence labels, then disconnect and confirm the key is absent from `settings.json`.
+- On a disposable test plan and repeatable CPU-heavy workload, verify Optimize blocks ineligible runs, captures a baseline, applies only High performance, compares at least ten after-samples, and restores the exact previous GUID on rollback and normal exit.
 - Close to tray, restore from the tray icon, and exit from the tray icon.
 
 ## Soak test

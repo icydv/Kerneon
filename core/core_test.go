@@ -99,6 +99,29 @@ func TestUnitConversionAndPrecision(t *testing.T) {
 	}
 }
 
+func TestRateFormatterStartsAtTheCorrectMagnitude(t *testing.T) {
+	now := time.Now()
+	f := RateFormatter{Mode: UnitBytes}
+	if got := f.Format(3_688_487, now); got != "3.69 MB/s" {
+		t.Fatalf("initial value leaked raw bytes: %q", got)
+	}
+	if got := FormatRate(3_688_487, UnitBits); got != "29.5 Mbps" {
+		t.Fatalf("stateless rate formatter got %q", got)
+	}
+}
+
+func TestPeakFormattingDoesNotChangeLiveUnit(t *testing.T) {
+	now := time.Now()
+	f := RateFormatter{Mode: UnitBytes}
+	if got := f.Format(24_000, now); got != "24.0 KB/s" {
+		t.Fatalf("live rate got %q", got)
+	}
+	_ = FormatRate(900_000_000, UnitBytes)
+	if got := f.Format(25_000, now.Add(100*time.Millisecond)); got != "25.0 KB/s" {
+		t.Fatalf("peak formatting changed live scale: %q", got)
+	}
+}
+
 func TestUnitHysteresisPreventsBoundaryFlicker(t *testing.T) {
 	f := RateFormatter{Mode: UnitAuto}
 	now := time.Now()
@@ -221,5 +244,42 @@ func TestPressureExplainer(t *testing.T) {
 	p := ExplainPressure(PressureInput{GPU: 99, CPU: 40, Memory: 50})
 	if p.Key != "gpu" || !strings.Contains(p.Title, "Likely") {
 		t.Fatalf("got %+v", p)
+	}
+}
+
+func TestOptimizerOffersMeasuredPowerExperimentOnlyWhenCPUBound(t *testing.T) {
+	got := AnalyzeOptimizations(OptimizationInput{CPU: 92, GPU: 54, Memory: 62, CPUFrequencyMHz: 3100, CPUMaxMHz: 4200, GameFocus: true, PowerPlan: "Balanced"})
+	found := false
+	for _, item := range got {
+		if item.Key == "power-plan" && item.Actionable {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("CPU-bound workload did not produce a power-profile experiment")
+	}
+	got = AnalyzeOptimizations(OptimizationInput{CPU: 45, GPU: 99, Memory: 62, GameFocus: true, PowerPlan: "Balanced"})
+	for _, item := range got {
+		if item.Key == "power-plan" {
+			t.Fatal("GPU-bound workload should not recommend a CPU power plan")
+		}
+	}
+	got = AnalyzeOptimizations(OptimizationInput{CPU: 94, GPU: 50, GameFocus: true, PowerPlan: "Revision - Ultra Performance"})
+	for _, item := range got {
+		if item.Key == "power-plan" {
+			t.Fatal("performance-oriented custom plan should not be replaced with standard High performance")
+		}
+	}
+}
+
+func TestBenchmarkComparisonRejectsWeakOrDifferentEvidence(t *testing.T) {
+	if got := CompareBenchmarks(Benchmark{Samples: 4}, Benchmark{Samples: 20}); got.Verdict != "Not enough evidence" {
+		t.Fatalf("weak sample verdict: %+v", got)
+	}
+	if got := CompareBenchmarks(Benchmark{Samples: 20, CPU: 20, GPU: 15}, Benchmark{Samples: 20, CPU: 80, GPU: 85}); got.Verdict != "Workloads were not comparable" {
+		t.Fatalf("different workload verdict: %+v", got)
+	}
+	if got := CompareBenchmarks(Benchmark{Samples: 30, CPU: 85, GPU: 60, CPUFrequencyMHz: 3000}, Benchmark{Samples: 30, CPU: 86, GPU: 61, CPUFrequencyMHz: 3210}); got.Verdict != "Measured improvement" {
+		t.Fatalf("measured gain verdict: %+v", got)
 	}
 }
