@@ -1,0 +1,5 @@
+Copyright 2026 Kerneon. All rights reserved.
+
+No license to copy, modify, redistribute, sublicense, or sell this software or
+its source code is granted by this release package. Third-party components are
+covered by the terms described in THIRD_PARTY_NOTICES.md.
