@@ -162,8 +162,13 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		if wParam != SIZE_MINIMIZED {
 			a.width = int32(lParam & 0xffff)
 			a.height = int32((lParam >> 16) & 0xffff)
-			a.config.Window.Width = int(a.width)
-			a.config.Window.Height = int(a.height)
+			if !a.compact {
+				var outer RECT
+				if ok, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&outer))); ok != 0 {
+					a.config.Window.Width = int(outer.Right - outer.Left)
+					a.config.Window.Height = int(outer.Bottom - outer.Top)
+				}
+			}
 			procInvalidateRect.Call(hwnd, 0, 0)
 		}
 		return 0
@@ -177,8 +182,13 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	case WM_GETMINMAXINFO:
 		var mmi MINMAXINFO
 		procRtlMoveMemory.Call(uintptr(unsafe.Pointer(&mmi)), lParam, unsafe.Sizeof(mmi))
-		mmi.PtMinTrackSize.X = a.px(960)
-		mmi.PtMinTrackSize.Y = a.px(640)
+		if a.compact {
+			mmi.PtMinTrackSize.X = a.px(430)
+			mmi.PtMinTrackSize.Y = a.px(270)
+		} else {
+			mmi.PtMinTrackSize.X = a.px(960)
+			mmi.PtMinTrackSize.Y = a.px(640)
+		}
 		procRtlMoveMemory.Call(lParam, uintptr(unsafe.Pointer(&mmi)), unsafe.Sizeof(mmi))
 		return 0
 	case WM_DPICHANGED:
@@ -514,7 +524,7 @@ func cycleMode(v []core.UnitMode, cur core.UnitMode, dir int) core.UnitMode {
 func (a *App) toggleCompact() {
 	a.compact = !a.compact
 	if a.compact {
-		procSetWindowPos.Call(a.hwnd, HWND_TOPMOST, 0, 0, uintptr(a.px(430)), uintptr(a.px(235)), SWP_NOMOVE|SWP_NOACTIVATE)
+		procSetWindowPos.Call(a.hwnd, HWND_TOPMOST, 0, 0, uintptr(a.px(430)), uintptr(a.px(270)), SWP_NOMOVE|SWP_NOACTIVATE)
 	} else {
 		procSetWindowPos.Call(a.hwnd, 0, 0, 0, uintptr(a.px(int32(a.config.Window.Width))), uintptr(a.px(int32(a.config.Window.Height))), SWP_NOMOVE|SWP_NOACTIVATE)
 		a.applyTopMost()

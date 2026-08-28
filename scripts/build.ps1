@@ -21,7 +21,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
     & $go vet ./...
     if ($LASTEXITCODE -ne 0) { throw 'Static analysis failed.' }
-    & $go build -trimpath -ldflags '-s -w -H=windowsgui' -o $resolvedOutput .
+    & $go build -buildvcs=false -trimpath -ldflags '-s -w -H=windowsgui' -o $resolvedOutput .
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     Get-Item -LiteralPath $resolvedOutput
 } finally {
