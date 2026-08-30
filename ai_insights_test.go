@@ -5,12 +5,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
 
 func TestTelemetryDigestExcludesProcessAndNetworkIdentity(t *testing.T) {
 	now := time.Now()
@@ -31,7 +37,7 @@ func TestTelemetryDigestExcludesProcessAndNetworkIdentity(t *testing.T) {
 }
 
 func TestAIInsightsRequestIsStatelessAndStructured(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		if r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Errorf("authorization header missing")
 		}
@@ -47,11 +53,10 @@ func TestAIInsightsRequestIsStatelessAndStructured(t *testing.T) {
 		if format["type"] != "json_schema" || format["strict"] != true {
 			t.Errorf("strict structured output missing: %#v", format)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"output":[{"type":"message","content":[{"type":"output_text","text":"{\"insights\":[{\"title\":\"GPU load\",\"explanation\":\"GPU is the leading measured load.\",\"evidence\":[\"GPU 94%\"],\"next_step\":\"Repeat the scene.\",\"confidence\":\"high\"},{\"title\":\"CPU headroom\",\"explanation\":\"CPU remains below saturation.\",\"evidence\":[\"CPU 51%\"],\"next_step\":\"Keep monitoring.\",\"confidence\":\"medium\"}]}"}]}]}`))
-	}))
-	defer server.Close()
-	insights, err := requestAIInsights(context.Background(), server.URL, "test-key", telemetryDigest{})
+		response := `{"output":[{"type":"message","content":[{"type":"output_text","text":"{\"insights\":[{\"title\":\"GPU load\",\"explanation\":\"GPU is the leading measured load.\",\"evidence\":[\"GPU 94%\"],\"next_step\":\"Repeat the scene.\",\"confidence\":\"high\"},{\"title\":\"CPU headroom\",\"explanation\":\"CPU remains below saturation.\",\"evidence\":[\"CPU 51%\"],\"next_step\":\"Keep monitoring.\",\"confidence\":\"medium\"}]}"}]}]}`
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(response)), Request: r}, nil
+	})}
+	insights, err := requestAIInsightsWithClient(context.Background(), "https://api.openai.test/v1/responses", "test-key", telemetryDigest{}, client)
 	if err != nil {
 		t.Fatal(err)
 	}

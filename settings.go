@@ -5,14 +5,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"kerneon/core"
 )
 
 type ConfigStore struct {
-	path   string
-	logger *Logger
+	path       string
+	logger     *Logger
+	writerOnce sync.Once
+	writes     chan configWriteRequest
+}
+
+type configWriteRequest struct {
+	config core.Config
+	done   chan error
 }
 
 func NewConfigStore(logger *Logger) *ConfigStore {
@@ -71,6 +79,39 @@ func (s *ConfigStore) loadPulseNet() (core.Config, bool) {
 }
 
 func (s *ConfigStore) Save(cfg core.Config) error {
+	s.ensureWriter()
+	done := make(chan error, 1)
+	s.writes <- configWriteRequest{config: cfg, done: done}
+	return <-done
+}
+
+// SaveAsync keeps routine UI state persistence off the window thread. Every
+// write still travels through the same FIFO worker as crash-critical Save
+// calls, so a slow disk cannot make a toggle stutter or reorder settings.
+func (s *ConfigStore) SaveAsync(cfg core.Config) {
+	s.ensureWriter()
+	s.writes <- configWriteRequest{config: cfg}
+}
+
+func (s *ConfigStore) ensureWriter() {
+	s.writerOnce.Do(func() {
+		s.writes = make(chan configWriteRequest, 64)
+		go func() {
+			for request := range s.writes {
+				err := s.saveFile(request.config)
+				if request.done != nil {
+					request.done <- err
+					continue
+				}
+				if err != nil && s.logger != nil {
+					s.logger.Error("settings", "async save", err)
+				}
+			}
+		}()
+	})
+}
+
+func (s *ConfigStore) saveFile(cfg core.Config) error {
 	core.ValidateConfig(&cfg)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

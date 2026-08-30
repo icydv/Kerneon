@@ -1,0 +1,26 @@
+name: Feature proposal
+description: Propose a measurable, understandable addition to Kerneon.
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the pain point without prescribing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Useful outcome
+      description: What should a non-technical user understand or accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Measurement and safety
+      description: How could Kerneon verify value, refuse unsupported systems and return to the prior state?
+    validations:
+      required: true

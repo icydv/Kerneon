@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <UI Id="KerneonUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <TextStyle Id="KerneonFontNormal" FaceName="Segoe UI" Size="9" Red="204" Green="220" Blue="225" />
+      <TextStyle Id="KerneonFontSmall" FaceName="Segoe UI" Size="8" Red="148" Green="174" Blue="182" />
+      <TextStyle Id="KerneonFontTitle" FaceName="Segoe UI" Size="9" Bold="yes" Red="236" Green="246" Blue="248" />
+      <TextStyle Id="KerneonFontHeading" FaceName="Segoe UI" Size="9" Bold="yes" Red="224" Green="244" Blue="246" />
+      <TextStyle Id="KerneonFontCyan" FaceName="Segoe UI" Size="8" Bold="yes" Red="111" Green="220" Blue="228" />
+      <TextStyle Id="KerneonFontFooter" FaceName="Segoe UI" Size="8" Red="31" Green="48" Blue="53" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+
+      <Dialog Id="KerneonWelcomeDlg" Width="493" Height="312" Title="Kerneon Setup" NoMinimize="yes">
+        <Control Id="Backdrop" Type="Bitmap" X="0" Y="0" Width="493" Height="224" Text="KerneonInstallerBackground" TabSkip="yes" />
+        <Control Id="Eyebrow" Type="Text" X="174" Y="31" Width="282" Height="16" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontCyan}KERNEON 0.1 · TECHNICAL PREVIEW" />
+        <Control Id="Title" Type="Text" X="174" Y="51" Width="284" Height="20" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontNormal}INSTALL KERNEON" />
+        <Control Id="Lead" Type="Text" X="175" Y="79" Width="278" Height="28" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontNormal}Understand the PC. Prove every performance change." />
+        <Control Id="FeatureOne" Type="Text" X="175" Y="132" Width="276" Height="18" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontNormal}• Native system and frame monitoring" />
+        <Control Id="FeatureTwo" Type="Text" X="175" Y="152" Width="276" Height="18" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontNormal}• Evidence-led Surge with exact rollback" />
+        <Control Id="FeatureThree" Type="Text" X="175" Y="172" Width="276" Height="18" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontNormal}• Secure Remote Link for every screen" />
+        <Control Id="Footnote" Type="Text" X="175" Y="193" Width="276" Height="24" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontSmall}Installs to Program Files. No background service, cloud account or hidden usage reporting." />
+        <Control Id="AcceptLicense" Type="CheckBox" X="175" Y="235" Width="218" Height="18" Property="KERNEONLICENSEACCEPTED" CheckBoxValue="1" Text="{\KerneonFontFooter}I understand this is a technical preview" />
+        <Control Id="ViewLicense" Type="PushButton" X="395" Y="230" Width="62" Height="22" Text="Read notice">
+          <Publish Event="SpawnDialog" Value="KerneonLicenseDlg">1</Publish>
+        </Control>
+        <Control Id="Publisher" Type="Text" X="31" Y="186" Width="115" Height="30" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontSmall}Created and published by Ryan Horth" />
+        <Control Id="Install" Type="PushButton" X="351" Y="270" Width="106" Height="27" Default="yes" Text="Install Kerneon">
+          <Publish Event="SpawnDialog" Value="KerneonLicenseRequiredDlg" Order="1">NOT KERNEONLICENSEACCEPTED</Publish>
+          <Publish Event="EndDialog" Value="Return" Order="2">KERNEONLICENSEACCEPTED</Publish>
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="265" Y="270" Width="78" Height="27" Cancel="yes" Text="Cancel">
+          <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="KerneonLicenseDlg" Width="493" Height="312" Title="Kerneon Technical Preview" NoMinimize="yes">
+        <Control Id="Backdrop" Type="Bitmap" X="0" Y="0" Width="493" Height="58" Text="WixUI_Bmp_Banner" TabSkip="yes" />
+        <Control Id="Title" Type="Text" X="174" Y="20" Width="280" Height="24" Transparent="yes" NoPrefix="yes" Text="{\KerneonFontFooter}Open-source and safety notice" />
+        <Control Id="LicenseText" Type="ScrollableText" X="174" Y="58" Width="283" Height="202" Sunken="yes" TabSkip="no">
+          <Text SourceFile="$(var.InstallerDir)\License.rtf" />
+        </Control>
+        <Control Id="Back" Type="PushButton" X="379" Y="270" Width="78" Height="27" Default="yes" Cancel="yes" Text="Back">
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Dialog Id="KerneonLicenseRequiredDlg" Width="315" Height="96" Title="Preview acknowledgement required" NoMinimize="yes">
+        <Control Id="Message" Type="Text" X="18" Y="17" Width="279" Height="35" NoPrefix="yes" Text="Confirm that you understand this is an unsigned technical preview before installing." />
+        <Control Id="Close" Type="PushButton" X="219" Y="61" Width="78" Height="24" Default="yes" Cancel="yes" Text="OK">
+          <Publish Event="EndDialog" Value="Return">1</Publish>
+        </Control>
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchKerneon" Order="1">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed</Publish>
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999">1</Publish>
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg">1</Publish>
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg">Installed</Publish>
+
+      <InstallUISequence>
+        <Show Dialog="KerneonWelcomeDlg" Before="ProgressDlg">NOT Installed</Show>
+        <Show Dialog="MaintenanceWelcomeDlg" Before="ProgressDlg">Installed AND NOT RESUME AND NOT PATCH</Show>
+      </InstallUISequence>
+
+      <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Kerneon" />
+      <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+      <Property Id="ARPNOMODIFY" Value="1" />
+    </UI>
+
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>

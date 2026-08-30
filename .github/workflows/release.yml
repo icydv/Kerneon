@@ -1,0 +1,46 @@
+name: Technical preview release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Test and build
+        shell: pwsh
+        run: |
+          go test -count=1 ./...
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -buildvcs=false -trimpath -ldflags '-s -w -H=windowsgui' -o dist/Kerneon-0.1.0-preview.1-portable.exe .
+          $hash = (Get-FileHash -Algorithm SHA256 dist/Kerneon-0.1.0-preview.1-portable.exe).Hash.ToLowerInvariant()
+          "$hash *Kerneon-0.1.0-preview.1-portable.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Attest portable build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/Kerneon-0.1.0-preview.1-portable.exe
+      - name: Publish or update prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME dist/Kerneon-0.1.0-preview.1-portable.exe dist/SHA256SUMS.txt --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME dist/Kerneon-0.1.0-preview.1-portable.exe dist/SHA256SUMS.txt --verify-tag --prerelease --title 'Kerneon 0.1.0 Technical Preview' --notes-file .github/release-notes-v0.1.0.md
+          }

@@ -26,6 +26,7 @@ const (
 	TH32CS_SNAPPROCESS                = 0x00000002
 	PROCESS_QUERY_INFORMATION         = 0x0400
 	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	PROCESS_SET_INFORMATION           = 0x0200
 	PROCESS_VM_READ                   = 0x0010
 	PDH_FMT_DOUBLE                    = 0x00000200
 	PDH_MORE_DATA                     = 0x800007D2
@@ -64,6 +65,10 @@ var (
 	procGetProcessTimes                  = kernel32.NewProc("GetProcessTimes")
 	procGetProcessIoCounters             = kernel32.NewProc("GetProcessIoCounters")
 	procGetProcessHandleCount            = kernel32.NewProc("GetProcessHandleCount")
+	procGetPriorityClass                 = kernel32.NewProc("GetPriorityClass")
+	procSetPriorityClass                 = kernel32.NewProc("SetPriorityClass")
+	procGetProcessInformation            = kernel32.NewProc("GetProcessInformation")
+	procSetProcessInformation            = kernel32.NewProc("SetProcessInformation")
 	procQueryFullProcessImageNameW       = kernel32.NewProc("QueryFullProcessImageNameW")
 	procGetPerformanceInfo               = psapi.NewProc("GetPerformanceInfo")
 	procK32GetProcessMemoryInfo          = kernel32.NewProc("K32GetProcessMemoryInfo")
@@ -163,6 +168,8 @@ type pdhQuery struct {
 	handle                                                 uintptr
 	diskUsage, diskRead, diskWrite, diskQueue, diskLatency uintptr
 	gpuUsage, gpuDedicated, gpuShared                      uintptr
+	dpcTime, interruptTime, interrupts, contextSwitches    uintptr
+	processorQueue, pageReads                              uintptr
 	ready                                                  bool
 	error                                                  string
 }
@@ -173,17 +180,18 @@ type processPrevious struct {
 }
 
 type TelemetryEngine struct {
-	mu       sync.RWMutex
-	cfg      core.Config
-	logger   *Logger
-	snapshot Snapshot
-	stop     chan struct{}
-	wg       sync.WaitGroup
-	running  bool
-	lowPower atomic.Bool
-	gameMode atomic.Bool
-	history  *core.Ring[HistorySample]
-	events   *core.Ring[Event]
+	mu             sync.RWMutex
+	cfg            core.Config
+	logger         *Logger
+	snapshot       Snapshot
+	stop           chan struct{}
+	wg             sync.WaitGroup
+	running        bool
+	lowPower       atomic.Bool
+	gameMode       atomic.Bool
+	history        *core.Ring[HistorySample]
+	processHistory *core.Ring[ProcessHistorySample]
+	events         *core.Ring[Event]
 
 	cpuIdle, cpuKernel, cpuUser uint64
 	cpuReady                    bool
@@ -200,7 +208,7 @@ type TelemetryEngine struct {
 }
 
 func NewTelemetryEngine(cfg core.Config, logger *Logger) *TelemetryEngine {
-	return &TelemetryEngine{cfg: cfg, logger: logger, history: core.NewRing[HistorySample](36000), events: core.NewRing[Event](200), autoRows: make(map[uint32]MIBIfRow2), processPrev: make(map[uint32]processPrevious), displayDown: core.NewEMA(180 * time.Millisecond), displayUp: core.NewEMA(180 * time.Millisecond)}
+	return &TelemetryEngine{cfg: cfg, logger: logger, history: core.NewRing[HistorySample](36000), processHistory: core.NewRing[ProcessHistorySample](48000), events: core.NewRing[Event](200), autoRows: make(map[uint32]MIBIfRow2), processPrev: make(map[uint32]processPrevious), displayDown: core.NewEMA(180 * time.Millisecond), displayUp: core.NewEMA(180 * time.Millisecond)}
 }
 
 func (e *TelemetryEngine) Start() {
@@ -258,6 +266,7 @@ func (e *TelemetryEngine) Snapshot() Snapshot {
 	defer e.mu.RUnlock()
 	s := e.snapshot
 	s.Processes = append([]ProcessMetric(nil), e.snapshot.Processes...)
+	s.ProcessHistory = e.processHistory.Values(nil)
 	s.Disk.Volumes = append([]VolumeData(nil), e.snapshot.Disk.Volumes...)
 	s.History = e.history.Values(nil)
 	s.Events = e.events.Values(nil)
@@ -751,11 +760,21 @@ func pingTarget(target string, timeout time.Duration) (float64, bool) {
 
 func (e *TelemetryEngine) sampleMedium() {
 	now := time.Now()
-	processes, prev := queryProcesses(e.processPrev, now)
+	e.mu.RLock()
+	lockedExecutable := e.cfg.Gaming.LockedProcessName
+	e.mu.RUnlock()
+	processes, prev := queryProcesses(e.processPrev, now, lockedExecutable)
 	volumes := queryVolumes()
 	e.mu.Lock()
 	e.processPrev = prev
 	e.snapshot.Processes = processes
+	limit := len(processes)
+	if limit > 20 {
+		limit = 20
+	}
+	for _, process := range processes[:limit] {
+		e.processHistory.Add(ProcessHistorySample{At: now, PID: process.PID, Name: process.Name, CPU: process.CPU, WorkingSet: process.WorkingSet, ReadBps: process.ReadBps, WriteBps: process.WriteBps})
+	}
 	e.snapshot.Disk.Volumes = volumes
 	if len(volumes) > 0 {
 		e.snapshot.Disk.Total = volumes[0].Total
@@ -764,7 +783,7 @@ func (e *TelemetryEngine) sampleMedium() {
 	p := e.pdh
 	e.mu.Unlock()
 	if p != nil {
-		disk, gpu := p.Sample()
+		disk, gpu, latency := p.sampleAll()
 		e.mu.Lock()
 		disk.Volumes = volumes
 		if len(volumes) > 0 {
@@ -776,11 +795,16 @@ func (e *TelemetryEngine) sampleMedium() {
 			gpu.Model = e.snapshot.System.GPU
 		}
 		e.snapshot.GPU = gpu
+		e.snapshot.Latency = latency
 		e.mu.Unlock()
 	}
 }
 
-func queryProcesses(previous map[uint32]processPrevious, now time.Time) ([]ProcessMetric, map[uint32]processPrevious) {
+func queryProcesses(previous map[uint32]processPrevious, now time.Time, protectedExecutables ...string) ([]ProcessMetric, map[uint32]processPrevious) {
+	protectedExecutable := ""
+	if len(protectedExecutables) > 0 {
+		protectedExecutable = protectedExecutables[0]
+	}
 	snap, _, _ := procCreateToolhelp32Snapshot.Call(TH32CS_SNAPPROCESS, 0)
 	if snap == 0 || snap == ^uintptr(0) {
 		return nil, previous
@@ -794,7 +818,11 @@ func queryProcesses(previous map[uint32]processPrevious, now time.Time) ([]Proce
 	for r != 0 {
 		p := ProcessMetric{PID: entry.ProcessID, Parent: entry.ParentProcessID, Threads: entry.Threads, Name: utf16String(entry.ExeFile[:])}
 		if p.PID != 0 {
-			queryProcessDetail(&p, previous[p.PID], now, next)
+			// The locked game is never opened with VM_READ. Kerneon can measure
+			// scheduling and I/O using limited-query rights; game-memory access is
+			// neither needed nor acceptable for an anti-cheat-safe product.
+			minimal := protectedExecutable != "" && strings.EqualFold(p.Name, protectedExecutable)
+			queryProcessDetail(&p, previous[p.PID], now, next, minimal)
 		}
 		result = append(result, p)
 		entry.Size = uint32(unsafe.Sizeof(entry))
@@ -803,6 +831,12 @@ func queryProcesses(previous map[uint32]processPrevious, now time.Time) ([]Proce
 	sort.Slice(result, func(i, j int) bool {
 		si := result[i].CPU + float64(result[i].WorkingSet)/1e9*2 + (result[i].ReadBps+result[i].WriteBps)/50e6
 		sj := result[j].CPU + float64(result[j].WorkingSet)/1e9*2 + (result[j].ReadBps+result[j].WriteBps)/50e6
+		if antiCheatProcessNames[strings.ToLower(result[i].Name)] != "" {
+			si += 1_000_000
+		}
+		if antiCheatProcessNames[strings.ToLower(result[j].Name)] != "" {
+			sj += 1_000_000
+		}
 		return si > sj
 	})
 	if len(result) > 80 {
@@ -811,8 +845,12 @@ func queryProcesses(previous map[uint32]processPrevious, now time.Time) ([]Proce
 	return result, next
 }
 
-func queryProcessDetail(p *ProcessMetric, prev processPrevious, now time.Time, next map[uint32]processPrevious) {
-	h, _, _ := procOpenProcess.Call(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ, 0, uintptr(p.PID))
+func queryProcessDetail(p *ProcessMetric, prev processPrevious, now time.Time, next map[uint32]processPrevious, minimal bool) {
+	access := uintptr(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ)
+	if minimal {
+		access = PROCESS_QUERY_LIMITED_INFORMATION
+	}
+	h, _, _ := procOpenProcess.Call(access, 0, uintptr(p.PID))
 	if h == 0 {
 		return
 	}
@@ -836,11 +874,13 @@ func queryProcessDetail(p *ProcessMetric, prev processPrevious, now time.Time, n
 			p.WriteBps = float64(io.WriteBytes-prev.Write) / dt
 		}
 	}
-	var mem processMemoryCountersEx
-	mem.CB = uint32(unsafe.Sizeof(mem))
-	if r, _, _ := procK32GetProcessMemoryInfo.Call(h, uintptr(unsafe.Pointer(&mem)), uintptr(mem.CB)); r != 0 {
-		p.WorkingSet = uint64(mem.WorkingSetSize)
-		p.PrivateBytes = uint64(mem.PrivateUsage)
+	if !minimal {
+		var mem processMemoryCountersEx
+		mem.CB = uint32(unsafe.Sizeof(mem))
+		if r, _, _ := procK32GetProcessMemoryInfo.Call(h, uintptr(unsafe.Pointer(&mem)), uintptr(mem.CB)); r != 0 {
+			p.WorkingSet = uint64(mem.WorkingSetSize)
+			p.PrivateBytes = uint64(mem.PrivateUsage)
+		}
 	}
 	var handles uint32
 	procGetProcessHandleCount.Call(h, uintptr(unsafe.Pointer(&handles)))
@@ -863,6 +903,31 @@ func queryProcessPath(pid uint32) string {
 		return ""
 	}
 	return utf16String(buf[:size])
+}
+
+func queryProcessPriority(pid uint32) uint32 {
+	h, _, _ := procOpenProcess.Call(PROCESS_QUERY_LIMITED_INFORMATION, 0, uintptr(pid))
+	if h == 0 {
+		return 0
+	}
+	defer procCloseHandle.Call(h)
+	priority, _, _ := procGetPriorityClass.Call(h)
+	return uint32(priority)
+}
+
+func setProcessPriority(pid, priority uint32) error {
+	if pid <= 4 || pid == uint32(os.Getpid()) {
+		return fmt.Errorf("Kerneon will not change a system-critical process or its own priority")
+	}
+	h, _, err := procOpenProcess.Call(PROCESS_SET_INFORMATION|PROCESS_QUERY_LIMITED_INFORMATION, 0, uintptr(pid))
+	if h == 0 {
+		return err
+	}
+	defer procCloseHandle.Call(h)
+	if ok, _, err := procSetPriorityClass.Call(h, uintptr(priority)); ok == 0 {
+		return err
+	}
+	return nil
 }
 
 func filetimeToTime(v uint64) time.Time {
@@ -911,6 +976,12 @@ func newPDHQuery() *pdhQuery {
 	p.add(`\GPU Engine(*)\Utilization Percentage`, &p.gpuUsage)
 	p.add(`\GPU Adapter Memory(*)\Dedicated Usage`, &p.gpuDedicated)
 	p.add(`\GPU Adapter Memory(*)\Shared Usage`, &p.gpuShared)
+	p.add(`\Processor Information(_Total)\% DPC Time`, &p.dpcTime)
+	p.add(`\Processor Information(_Total)\% Interrupt Time`, &p.interruptTime)
+	p.add(`\Processor Information(_Total)\Interrupts/sec`, &p.interrupts)
+	p.add(`\System\Context Switches/sec`, &p.contextSwitches)
+	p.add(`\System\Processor Queue Length`, &p.processorQueue)
+	p.add(`\Memory\Page Reads/sec`, &p.pageReads)
 	procPdhCollectQueryData.Call(p.handle)
 	return p
 }
@@ -931,16 +1002,23 @@ func (p *pdhQuery) Close() {
 	}
 }
 func (p *pdhQuery) Sample() (DiskData, GPUData) {
+	disk, gpu, _ := p.sampleAll()
+	return disk, gpu
+}
+
+func (p *pdhQuery) sampleAll() (DiskData, GPUData, LatencyData) {
 	d := DiskData{ProviderError: p.error}
 	g := GPUData{Provider: "Windows GPU performance counters", Error: p.error}
+	l := LatencyData{Provider: "Windows PDH scheduler and interrupt counters", Error: p.error}
 	if p.handle == 0 {
-		return d, g
+		return d, g, l
 	}
 	r, _, _ := procPdhCollectQueryData.Call(p.handle)
 	if r != 0 {
 		d.ProviderError = fmt.Sprintf("PDH collect: 0x%x", r)
 		g.Error = d.ProviderError
-		return d, g
+		l.Error = d.ProviderError
+		return d, g, l
 	}
 	d.Usage = clampFloat(p.value(p.diskUsage), 0, 100)
 	d.ReadBps = math.Max(0, p.value(p.diskRead))
@@ -951,7 +1029,14 @@ func (p *pdhQuery) Sample() (DiskData, GPUData) {
 	g.DedicatedUsed = math.Max(0, p.arraySum(p.gpuDedicated))
 	g.SharedUsed = math.Max(0, p.arraySum(p.gpuShared))
 	g.Available = p.gpuUsage != 0 && g.Error == ""
-	return d, g
+	l.DPCTimePercent = math.Max(0, p.value(p.dpcTime))
+	l.InterruptTimePercent = math.Max(0, p.value(p.interruptTime))
+	l.InterruptsPerSec = math.Max(0, p.value(p.interrupts))
+	l.ContextSwitches = math.Max(0, p.value(p.contextSwitches))
+	l.ProcessorQueue = math.Max(0, p.value(p.processorQueue))
+	l.PageReadsPerSec = math.Max(0, p.value(p.pageReads))
+	l.Available = p.dpcTime != 0 && p.interruptTime != 0 && p.processorQueue != 0 && l.Error == ""
+	return d, g, l
 }
 func (p *pdhQuery) value(counter uintptr) float64 {
 	if counter == 0 {

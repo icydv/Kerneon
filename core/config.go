@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const ConfigVersion = 2
+const ConfigVersion = 5
 
 type SamplingConfig struct {
 	NetworkHz int  `json:"network_hz"`
@@ -20,14 +20,15 @@ type SamplingConfig struct {
 type Config struct {
 	Version int `json:"version"`
 	Window  struct {
-		Width       int    `json:"width"`
-		Height      int    `json:"height"`
-		X           int    `json:"x"`
-		Y           int    `json:"y"`
-		Maximized   bool   `json:"maximized"`
-		LastPage    string `json:"last_page"`
-		AlwaysTop   bool   `json:"always_on_top"`
-		CloseToTray bool   `json:"close_to_tray"`
+		Width              int    `json:"width"`
+		Height             int    `json:"height"`
+		X                  int    `json:"x"`
+		Y                  int    `json:"y"`
+		Maximized          bool   `json:"maximized"`
+		LastPage           string `json:"last_page"`
+		AlwaysTop          bool   `json:"always_on_top"`
+		CloseToTray        bool   `json:"close_to_tray"`
+		ResourcesCollapsed bool   `json:"resources_collapsed,omitempty"`
 	} `json:"window"`
 	Sampling SamplingConfig `json:"sampling"`
 	Network  struct {
@@ -40,17 +41,36 @@ type Config struct {
 		ReducedMotion bool `json:"reduced_motion"`
 		GraphSeconds  int  `json:"graph_seconds"`
 		WindowOpacity int  `json:"window_opacity"`
+		TechnicalMode bool `json:"technical_mode"`
 	} `json:"appearance"`
 	History struct {
 		Enabled          bool `json:"enabled"`
 		RetentionMinutes int  `json:"retention_minutes"`
 	} `json:"history"`
 	Gaming struct {
-		GameFocus bool `json:"game_focus"`
+		GameFocus         bool   `json:"game_focus"`
+		LockedProcessName string `json:"locked_process_name,omitempty"`
+		FPSHUD            bool   `json:"fps_hud,omitempty"`
 	} `json:"gaming"`
 	Tuning struct {
-		PendingPowerPlan string `json:"pending_power_plan,omitempty"`
+		PendingPowerPlan     string `json:"pending_power_plan,omitempty"`
+		PendingTemporaryPlan string `json:"pending_temporary_plan,omitempty"`
+		Autopilot            bool   `json:"autopilot"`
+		Mode                 string `json:"mode"`
+		SafetyNoticeSeen     bool   `json:"safety_notice_seen,omitempty"`
+		AntiCheatGuard       bool   `json:"anti_cheat_guard"`
+		LabDisclaimerVersion int    `json:"lab_disclaimer_version,omitempty"`
+		LabDisclaimerAt      int64  `json:"lab_disclaimer_at,omitempty"`
+		LabProfile           string `json:"lab_profile,omitempty"`
+		LabAutoWithSurge     bool   `json:"lab_auto_with_surge,omitempty"`
 	} `json:"tuning"`
+	Remote struct {
+		Enabled bool `json:"enabled"`
+		Port    int  `json:"port"`
+	} `json:"remote"`
+	Trust struct {
+		PinnedFingerprint string `json:"pinned_fingerprint,omitempty"`
+	} `json:"trust"`
 }
 
 func DefaultConfig() Config {
@@ -64,9 +84,13 @@ func DefaultConfig() Config {
 	c.Network.Units = UnitAuto
 	c.Network.PingTarget, c.Network.PingSeconds = "1.1.1.1", 2
 	c.Appearance.GraphSeconds = 60
-	c.Appearance.WindowOpacity = 96
+	c.Appearance.WindowOpacity = 99
 	c.History.Enabled, c.History.RetentionMinutes = true, 60
 	c.Gaming.GameFocus = true
+	c.Tuning.Mode = "guarded"
+	c.Tuning.AntiCheatGuard = true
+	c.Tuning.LabProfile = "balanced"
+	c.Remote.Port = 47652
 	return c
 }
 
@@ -133,7 +157,10 @@ func ValidateConfig(c *Config) {
 	c.Version = ConfigVersion
 	c.Window.Width = clamp(c.Window.Width, 960, 5120)
 	c.Window.Height = clamp(c.Window.Height, 640, 2880)
-	if !oneOf(c.Window.LastPage, "overview", "cpu", "gpu", "memory", "storage", "network", "processes", "gaming", "insights", "optimize", "history", "alerts", "system", "settings") {
+	if c.Window.X <= -30000 || c.Window.X >= 30000 || c.Window.Y <= -30000 || c.Window.Y >= 30000 {
+		c.Window.X, c.Window.Y = -1, -1
+	}
+	if !oneOf(c.Window.LastPage, "overview", "cpu", "gpu", "memory", "storage", "network", "processes", "gaming", "insights", "optimize", "history", "alerts", "system", "hardware", "remote", "settings") {
 		c.Window.LastPage = "overview"
 	}
 	if !oneOfInt(c.Sampling.NetworkHz, 10, 20, 30, 60, 90, 120) {
@@ -157,10 +184,23 @@ func ValidateConfig(c *Config) {
 	if !oneOfInt(c.Appearance.GraphSeconds, 30, 60, 120, 300) {
 		c.Appearance.GraphSeconds = 60
 	}
-	if !oneOfInt(c.Appearance.WindowOpacity, 92, 96, 100) {
-		c.Appearance.WindowOpacity = 96
+	if !oneOfInt(c.Appearance.WindowOpacity, 98, 99, 100) {
+		c.Appearance.WindowOpacity = 99
 	}
 	c.History.RetentionMinutes = clamp(c.History.RetentionMinutes, 5, 10080)
+	c.Remote.Port = clamp(c.Remote.Port, 1024, 65535)
+	if !oneOf(c.Tuning.Mode, "guarded", "performance") {
+		c.Tuning.Mode = "guarded"
+	}
+	if !oneOf(c.Tuning.LabProfile, "conservative", "balanced", "enthusiast") {
+		c.Tuning.LabProfile = "balanced"
+	}
+	if c.Tuning.LabDisclaimerVersion < 0 {
+		c.Tuning.LabDisclaimerVersion = 0
+	}
+	if c.Tuning.LabDisclaimerAt < 0 {
+		c.Tuning.LabDisclaimerAt = 0
+	}
 }
 
 func clamp(value, low, high int) int {

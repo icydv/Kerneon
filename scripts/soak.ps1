@@ -19,6 +19,8 @@ using System.Runtime.InteropServices;
 public static class KerneonSoakNative {
     [DllImport("user32.dll")] public static extern int GetGuiResources(IntPtr process, int flag);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr window, int command);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr window);
 }
 '@
 
@@ -29,11 +31,22 @@ $deadline = (Get-Date).AddMinutes($DurationMinutes)
 $lastAt = Get-Date
 $lastCpu = [TimeSpan]::Zero
 try {
-    Start-Sleep -Seconds 2
-    $process.Refresh()
+    $windowDeadline = (Get-Date).AddSeconds(10)
+    do {
+        Start-Sleep -Milliseconds 100
+        $process.Refresh()
+    } while (-not $process.HasExited -and $process.MainWindowHandle -eq 0 -and (Get-Date) -lt $windowDeadline)
+    if ($process.HasExited -or $process.MainWindowHandle -eq 0) { throw 'Kerneon did not create its main window within 10 seconds.' }
+    if ($Minimize) {
+        [KerneonSoakNative]::ShowWindow($process.MainWindowHandle, 6) | Out-Null
+        $stateDeadline = (Get-Date).AddSeconds(2)
+        do {
+            Start-Sleep -Milliseconds 50
+        } while (-not [KerneonSoakNative]::IsIconic($process.MainWindowHandle) -and (Get-Date) -lt $stateDeadline)
+        if (-not [KerneonSoakNative]::IsIconic($process.MainWindowHandle)) { throw 'Kerneon did not enter the minimized state.' }
+    }
     $lastCpu = $process.TotalProcessorTime
     $lastAt = Get-Date
-    if ($Minimize) { [KerneonSoakNative]::ShowWindow($process.MainWindowHandle, 6) | Out-Null }
     while ((Get-Date) -lt $deadline -and -not $process.HasExited) {
         Start-Sleep -Seconds $IntervalSeconds
         $process.Refresh()
@@ -49,7 +62,8 @@ try {
             Threads = $process.Threads.Count
             GDIObjects = [KerneonSoakNative]::GetGuiResources($process.Handle, 0)
             Responding = $process.Responding
-            WindowVisible = $process.MainWindowHandle -ne 0
+            WindowVisible = [KerneonSoakNative]::IsWindowVisible($process.MainWindowHandle)
+            WindowMinimized = [KerneonSoakNative]::IsIconic($process.MainWindowHandle)
         })
         $lastCpu = $process.TotalProcessorTime
         $lastAt = $now

@@ -184,7 +184,7 @@ func (a *App) applyPerformancePlan() {
 		return
 	}
 	a.config.Tuning.PendingPowerPlan = view.PowerGUID
-	if err := a.store.Save(a.config); err != nil {
+	if err := a.store.Save(a.configSnapshot()); err != nil {
 		a.config.Tuning.PendingPowerPlan = ""
 		a.optimizer.mu.Lock()
 		a.optimizer.Error = "Rollback journal could not be saved; no power-plan change was made: " + err.Error()
@@ -193,7 +193,7 @@ func (a *App) applyPerformancePlan() {
 	}
 	if _, err := runPowercfg("/setactive", highPerformanceGUID); err != nil {
 		a.config.Tuning.PendingPowerPlan = ""
-		_ = a.store.Save(a.config)
+		_ = a.store.Save(a.configSnapshot())
 		a.optimizer.mu.Lock()
 		a.optimizer.Error = err.Error()
 		a.optimizer.mu.Unlock()
@@ -271,6 +271,7 @@ func (a *App) keepOptimization() {
 
 func (a *App) restoreInterruptedOptimization() {
 	guid := strings.TrimSpace(a.config.Tuning.PendingPowerPlan)
+	temporary := strings.TrimSpace(a.config.Tuning.PendingTemporaryPlan)
 	if guid == "" || !powerGUIDPattern.MatchString(guid) {
 		return
 	}
@@ -278,8 +279,14 @@ func (a *App) restoreInterruptedOptimization() {
 		a.logger.Error("optimize", "restore interrupted power-plan experiment", err)
 		return
 	}
-	a.config.Tuning.PendingPowerPlan = ""
-	if err := a.store.Save(a.config); err != nil {
+	if temporary != "" && powerGUIDPattern.MatchString(temporary) {
+		if _, err := runPowercfg("/delete", temporary); err != nil {
+			a.logger.Error("optimize", "delete interrupted temporary Surge policy", err)
+			return
+		}
+	}
+	a.config.Tuning.PendingPowerPlan, a.config.Tuning.PendingTemporaryPlan = "", ""
+	if err := a.store.Save(a.configSnapshot()); err != nil {
 		a.logger.Error("optimize", "clear rollback journal", err)
 	}
 	a.logger.Info("optimize", "restored power plan from interrupted experiment")

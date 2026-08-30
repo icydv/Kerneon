@@ -1,5 +1,7 @@
 # PulseNet 1.0 audit
 
+Kerneon is created and published by **Ryan Horth**.
+
 The supplied archive contained a 50 KB `main.go`, `go.mod`, and a short readme. It was a compact Go/Win32/GDI network monitor built around `GetIfTable2` and Windows ICMP.
 
 ## Baseline findings

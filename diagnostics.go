@@ -16,8 +16,8 @@ import (
 
 func (a *App) systemSummary() string {
 	s := a.snapshot
-	return fmt.Sprintf("Kerneon %s\n%s (build %s, %s)\nComputer: %s %s\nCPU: %s\nGPU: %s\nRAM: %s\nSystem volume: %s free of %s\nNetwork: %s (%s)\nUptime: %s",
-		appVersion, s.System.Windows, s.System.Build, s.System.Architecture,
+	return fmt.Sprintf("Kerneon %s\nCreated and published by %s\n%s (build %s, %s)\nComputer: %s %s\nCPU: %s\nGPU: %s\nRAM: %s\nSystem volume: %s free of %s\nNetwork: %s (%s)\nUptime: %s",
+		appVersion, appPublisher, s.System.Windows, s.System.Build, s.System.Architecture,
 		s.System.Manufacturer, s.System.Model, s.System.CPU, s.System.GPU,
 		core.FormatBytes(s.System.InstalledRAM), core.FormatBytes(s.Disk.Free), core.FormatBytes(s.Disk.Total),
 		s.Network.Name, s.Network.Kind, formatDuration(time.Since(s.System.BootTime)))
@@ -47,7 +47,7 @@ func (a *App) exportDiagnostics() (string, error) {
 		}
 		return current
 	}
-	manifest := map[string]any{"application": "Kerneon", "version": appVersion, "created_utc": time.Now().UTC(), "privacy": "Usernames, home paths, IP addresses and process paths are sanitized.", "system": a.systemSummary(), "snapshot_age_ms": time.Since(a.snapshot.At).Milliseconds(), "providers": map[string]string{"gpu": a.snapshot.GPU.Provider, "gpu_error": a.snapshot.GPU.Error, "disk_error": a.snapshot.Disk.ProviderError}}
+	manifest := map[string]any{"application": "Kerneon", "version": appVersion, "creator": appCreator, "publisher": appPublisher, "created_utc": time.Now().UTC(), "privacy": "Usernames, home paths, IP addresses and process paths are sanitized.", "system": a.systemSummary(), "snapshot_age_ms": time.Since(a.snapshot.At).Milliseconds(), "providers": map[string]string{"gpu": a.snapshot.GPU.Provider, "gpu_error": a.snapshot.GPU.Error, "disk_error": a.snapshot.Disk.ProviderError}}
 	if err := zipJSON(zw, "manifest.json", manifest); err != nil {
 		return "", closeWith(err)
 	}

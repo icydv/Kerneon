@@ -168,6 +168,10 @@ func (a *App) generateAIInsights() {
 }
 
 func requestAIInsights(ctx context.Context, endpoint, key string, digest telemetryDigest) ([]AIInsight, error) {
+	return requestAIInsightsWithClient(ctx, endpoint, key, digest, &http.Client{Timeout: 30 * time.Second})
+}
+
+func requestAIInsightsWithClient(ctx context.Context, endpoint, key string, digest telemetryDigest, client *http.Client) ([]AIInsight, error) {
 	input, err := json.Marshal(digest)
 	if err != nil {
 		return nil, err
@@ -186,7 +190,7 @@ func requestAIInsights(ctx context.Context, endpoint, key string, digest telemet
 	payload := map[string]any{
 		"model": openAIModel, "store": false, "max_output_tokens": 1200,
 		"reasoning":    map[string]any{"effort": "low"},
-		"instructions": "You are Kerneon's telemetry analyst. Use only the supplied measurements. Produce concise, situation-specific observations. Never invent FPS, causes, hardware facts, or performance gains. Distinguish correlation from causation. Suggest a test when evidence is insufficient. Do not suggest registry cleaners, RAM cleaners, blanket service disabling, driver updaters, or arbitrary boost buttons. The output is advisory and cannot control the PC.",
+		"instructions": "You are Kerneon's telemetry analyst. Use only the supplied measurements. Produce concise, situation-specific observations. Never invent FPS, causes, hardware facts, or performance gains. Distinguish correlation from causation. Suggest a test when evidence is insufficient. Network measurements may be secondary context but must never displace local performance, frame-delivery, resource-pressure or stability insights. Do not suggest registry cleaners, RAM cleaners, blanket service disabling, driver updaters, or arbitrary boost buttons. The output is advisory and cannot control the PC.",
 		"input":        string(input),
 		"text":         map[string]any{"format": map[string]any{"type": "json_schema", "name": "kerneon_insights", "strict": true, "schema": schema}},
 	}
@@ -200,7 +204,7 @@ func requestAIInsights(ctx context.Context, endpoint, key string, digest telemet
 	}
 	req.Header.Set("Authorization", "Bearer "+key)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

@@ -46,3 +46,22 @@ func TestConfigStorePreservesMalformedFile(t *testing.T) {
 		t.Fatalf("replacement settings missing: %v", err)
 	}
 }
+
+func TestConfigStoreAsyncWritesRemainOrdered(t *testing.T) {
+	dir := t.TempDir()
+	store := &ConfigStore{path: filepath.Join(dir, "settings.json"), logger: &Logger{}}
+	first := core.DefaultConfig()
+	first.Window.LastPage = "cpu"
+	store.SaveAsync(first)
+
+	last := first
+	last.Window.LastPage = "optimize"
+	if err := store.Save(last); err != nil {
+		t.Fatalf("flush ordered settings: %v", err)
+	}
+
+	loaded := store.Load()
+	if loaded.Window.LastPage != "optimize" {
+		t.Fatalf("async save overtook the following synchronous save: got %q", loaded.Window.LastPage)
+	}
+}

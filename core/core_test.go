@@ -186,8 +186,41 @@ func TestConfigValidation(t *testing.T) {
 
 func TestLegacyConfigMigration(t *testing.T) {
 	got, err := ParseConfig([]byte(`{"polling_hz":20,"graph_seconds":120,"units":"bytes","ping_target":"9.9.9.9","ping_interval_sec":5}`))
-	if err != nil || got.Version != 2 || got.Sampling.NetworkHz != 20 || got.Network.Units != UnitBytes {
+	if err != nil || got.Version != ConfigVersion || got.Sampling.NetworkHz != 20 || got.Network.Units != UnitBytes {
 		t.Fatalf("got %+v err=%v", got, err)
+	}
+}
+
+func TestOlderConfigEnablesAntiCheatGuardByDefault(t *testing.T) {
+	got, err := ParseConfig([]byte(`{"version":3,"tuning":{"mode":"performance"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Tuning.AntiCheatGuard {
+		t.Fatal("anti-cheat guard must default on when an older config has no preference")
+	}
+}
+
+func TestOlderConfigKeepsTuningLabUnarmed(t *testing.T) {
+	got, err := ParseConfig([]byte(`{"version":4,"tuning":{"mode":"performance"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Tuning.LabDisclaimerVersion != 0 || got.Tuning.LabDisclaimerAt != 0 {
+		t.Fatal("an upgrade must never imply acceptance of the hardware-tuning disclaimer")
+	}
+	if got.Tuning.LabProfile != "balanced" {
+		t.Fatalf("unexpected tuning profile %q", got.Tuning.LabProfile)
+	}
+}
+
+func TestMinimizedWindowCoordinatesAreNeverRestored(t *testing.T) {
+	got, err := ParseConfig([]byte(`{"version":5,"window":{"width":1240,"height":800,"x":362,"y":-32768}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Window.X != -1 || got.Window.Y != -1 {
+		t.Fatalf("minimized coordinates survived validation: %d,%d", got.Window.X, got.Window.Y)
 	}
 }
 

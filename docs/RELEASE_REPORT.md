@@ -1,112 +1,102 @@
-# Kerneon 1.0.0 release report
+# Kerneon 0.1.0-preview.1 release report
 
-Release candidate built and verified on 28 August 2026.
+Kerneon is created and published by **Ryan Horth** and released under
+`GPL-3.0-only`.
+
+This build is a public technical preview, not a production release. It is
+unsigned because the project does not currently have an Authenticode
+certificate. Windows may therefore show a reputation warning.
 
 ## Release identity
 
 | Item | Value |
 |---|---|
-| Product | Kerneon 1.0.0 portable x64 |
-| Executable | `Kerneon.exe` |
-| Size | 7,843,840 bytes (7.48 MiB) |
-| SHA-256 | `7493B2318F22BBB9A97C6E0169C9ED76274520279289DAAABE968FDB08018AA0` |
-| Toolchain | Go 1.27.0, `CGO_ENABLED=0`, `GOARCH=amd64`, trimmed paths and symbols |
-| Runtime dependencies | Windows system DLLs only; no third-party Go modules. Optional AI uses Go's standard HTTPS client. |
-| Privilege | `asInvoker`; no administrator requirement |
-| Signature | Unsigned; no Authenticode certificate was supplied |
+| Version | `0.1.0-preview.1` |
+| Platform | Windows x64 |
+| Portable executable | `Kerneon-0.1.0-preview.1-portable.exe` |
+| Installer | `Kerneon-0.1.0-preview.1-x64.msi` |
+| Toolchain | Go 1.27, `CGO_ENABLED=0`, trimmed paths and symbols |
+| Runtime privilege | Starts as the current user; protected operations require explicit Windows elevation |
+| Telemetry | None |
+| Network service | Remote Link is off by default and listens only when the user enables it |
 
-The executable contains its GUI manifest, application icon, file/product version 1.0.0, product name, description, copyright, and original filename.
+Release downloads include `SHA256SUMS.txt`. Verify a download in PowerShell
+with:
 
-## Verification environment
+```powershell
+Get-FileHash .\Kerneon-0.1.0-preview.1-portable.exe -Algorithm SHA256
+```
 
-- Windows 11 Pro 10.0.26200 (build 26200), x64.
-- AMD Ryzen 7 5800X: 8 physical cores, 16 logical processors.
-- 31.9 GB installed memory.
-- NVIDIA GeForce RTX 2080 SUPER, driver 32.0.15.9159.
-- Connected Intel Wi-Fi adapter selected automatically; WFP/filter duplicates excluded.
-- Default Kerneon settings unless a test explicitly states 120 Hz or minimized mode.
+## Verification performed
 
-Results describe this machine and build. They are not universal performance guarantees.
+The tagged source must pass the following gates:
 
-## Automated verification
+- `go mod verify`;
+- `go test -count=1 ./...`;
+- `go vet -unsafeptr=false ./...`;
+- a clean Windows GUI portable build;
+- MSI creation and Windows Installer database validation;
+- embedded icon, product name, version, copyright, and GPL metadata checks;
+- SHA-256 checksums generated after the final build; and
+- the Windows GitHub Actions workflow on the published commit.
 
-`scripts/test.ps1` completed successfully:
+The `unsafeptr` vet analyser is disabled because Kerneon's optional ADLX FFI
+bridge reconstructs opaque vendor handles returned as `uintptr`. All other
+standard vet analysers remain enabled. This is an explicit review item, not a
+claim that unsafe code is risk-free.
 
-- 30/30 named tests passed.
-- 23 deterministic core tests passed.
-- Seven Windows/application integration tests passed.
-- `go vet ./...` completed with no warnings.
-- A real 1.5-second 120 Hz network run remained within the practical timer tolerance.
-- Enabling adaptive low-power state reduced that collector toward 10 Hz.
-- CPU/memory/topology, volume, interface, process, disk/GPU PDH, settings atomicity, and malformed settings recovery checks passed.
-- Provider failure isolation, alert hysteresis/cooldown, counter resets/wraps, zero/tiny elapsed time, immediate rate magnitude, peak/live formatting isolation, unit hysteresis, graph time mapping/scaling, aggregation, history lifetime, optimizer gating, workload comparability, and proof verdict checks passed.
-- The AI tests verify the telemetry digest excludes process/network identity and that the request is stateless with strict Structured Outputs. They use a local mock server; no live API request or billing occurred.
+## Performance evidence
 
-The build command executes tests and static analysis before producing the executable. The final binary reports only the local `kerneon` module and standard toolchain metadata.
+Kerneon reports measurements and preserves a rollback trail for system changes.
+It does **not** promise a universal FPS uplift. Performance results depend on the
+game, bottleneck, hardware, drivers, temperatures, power limits, and background
+workload.
 
-## External performance measurements
+Early live testing was conducted on one Ryzen 7 5800X / GeForce RTX 2080 SUPER
+system. That testing exercised game-process selection, frame-time observation,
+Surge lifecycle and restoration, Remote Link monitoring, and the stutter guard.
+It is useful engineering evidence but not a statistically controlled product
+benchmark. No percentage uplift from that session is advertised.
 
-CPU is external process CPU normalized across 16 logical processors. Memory and object counts are read from the Windows process object. Each table is a separate process run.
+A defensible comparison requires the same game route, graphics settings,
+resolution, driver state, temperature band, and background workload across
+multiple alternating baseline and Surge runs. Contributors can use Kerneon's
+capture and frame-proof tools to produce that evidence.
 
-| Scenario | Duration / samples | Responsive | Average CPU | Max CPU | Average working set | Average private | Handle range | GDI range |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Visible Overview, 60 FPS | 1 min / 29 | 29/29 | 0.796% | 0.969% | 33.15 MB | 62.32 MB | 400–429 | 37–38 |
-| Minimized, adaptive | 1 min / 29 | 29/29 | 0.025% | 0.146% | 32.63 MB | 62.19 MB | 392–410 | 37–37 |
+## Safety and security boundaries
 
-The minimized run's perfectly flat GDI count and bounded handle range do not indicate resource leakage over the observed minute. The larger private virtual allocation versus the earlier build comes from including Go's standard TLS/HTTP stack for optional AI; working set remained near 33 MB. These short runs cannot establish long-term leak behavior.
+- Surge snapshots reversible state before applying a change and restores that
+  state when the session ends or after interrupted recovery.
+- Hardware tuning is capability-gated. Unsupported controls are not simulated.
+- GPU offset control depends on a compatible vendor driver/API and remains
+  opt-in. CPU voltage or firmware overclocking is not implemented.
+- Anti-cheat guardrails are enabled by default. Disabling them does not guarantee
+  compatibility and Kerneon must never inject into or patch a game process.
+- Remote Link pairing, control, screen view, and input are separate grants.
+  Rotating pairing credentials invalidates existing sessions.
+- Remote Link pairing/signalling currently uses HTTP on the private LAN. Use it
+  only on a trusted network; internet exposure is unsupported.
+- The screen-control preview cannot cross UAC secure desktop or Windows integrity
+  boundaries and is not a replacement for a security-audited remote-management
+  product.
+- AI insights are optional, advisory, stateless per request, and have no direct
+  system-control tools.
 
-The included soak harness defaults to two hours. Only the one-minute final-build runs above and earlier short pre-feature runs were performed here; they must not be represented as completion of the full two-hour soak.
+## Hardware and compatibility scope
 
-## PulseNet baseline comparison
+Hardware-specific functionality is discovered at runtime. Vendor name alone is
+not treated as proof that a clock, power, thermal, or fan control is available.
+The first preview has not been validated across every AMD, Intel, NVIDIA, laptop,
+OEM, firmware, driver, display-scale, anti-cheat, or Windows configuration.
 
-The supplied PulseNet 1.0 binary was rebuilt and measured on the same PC before replacement.
-
-| State | PulseNet CPU | Kerneon CPU | PulseNet working set | Kerneon working set | Interpretation |
-|---|---:|---:|---:|---:|---|
-| Visible | 1.169% | 0.796% | 23.62 MB | 33.15 MB | Kerneon used about 32% less CPU at a 60 FPS default while collecting substantially more telemetry; working set increased by 9.53 MB. |
-| Minimized | 0.370% | 0.025% | 23.45 MB | 32.63 MB | Adaptive collection and 1 FPS rendering reduced background CPU by about 93%; working set increased by 9.18 MB. |
-
-PulseNet was 3,046,912 bytes; Kerneon is 7,843,840 bytes. The increase covers native system/process/storage/GPU providers, hardened settings/logging, diagnostics, full navigation, histories, process detail, tray/compact lifecycle, optimizer transaction safety, standard-library TLS/HTTP support, and embedded product resources.
-
-## Startup and lifecycle
-
-Five launches reached a non-zero responding main window in 78.1, 30.1, 30.5, 30.8, and 30.6 ms. The warm median was 30.6 ms; the first measured launch was 78.1 ms.
-
-The release lifecycle check verified:
-
-- the main window was responding before close;
-- Close to tray kept the process and hidden window alive;
-- tray left-click restored a visible window;
-- tray right-click exited the process;
-- settings persisted across a normal shutdown.
-- Compact changed the outer frame from 1240 × 800 to 430 × 270 and Expand restored exactly 1240 × 800 without changing the saved normal size.
-
-## Visual and interaction QA
-
-Automated Win32 input plus off-screen `PrintWindow` capture was used to inspect Overview, Processes list, process detail, Gaming, Insights, Optimize, and Settings without relying on desktop screenshots. The inspected default window was 1240 × 800 at the development monitor's active 100% scale.
-
-Verified behavior includes page navigation, stable card/grid alignment, the pressure-arc Kerneon monogram and embedded icon, Overview live signature, readable empty/unavailable values, process filter/list/map/detail interactions, process copy/open-location action placement, Insights privacy disclosure, Optimize's evidence-closed state on an existing Ultra Performance plan, 60-second incident capture, compact mode, material/opacity settings, resize constraints, and dark-title-bar integration.
-
-The application is per-monitor-v2 DPI aware and responds to `WM_DPICHANGED`, but additional physical DPI/multi-monitor combinations were not available for this release run. Physical sleep/resume was likewise not automated; the baseline reset path is implemented and unit behavior around resets is covered.
-
-## Correctness and safety notes
-
-- Counter differences use actual elapsed time and reject invalid intervals.
-- Counter regression or resume resets a baseline instead of emitting a false spike.
-- Interface auto-selection monitors one physical connected adapter and rejects common duplicate/filter/tunnel rows.
-- Ping loss is not displayed as meaningful before ten observations.
-- GPU/disk provider errors are visible and isolated from other collectors.
-- Settings are versioned, validated, migrated, flushed, and atomically replaced.
-- Diagnostic export is user initiated and sanitizes username, home path, and IPv4-like values.
-- Process actions in 1.0.0 are read-only. No critical-process termination or scheduling mutation surface exists.
-- Game Focus uses full-monitor foreground-window detection only; it performs no injection or game-memory access.
-- AI is explicit, stateless, identity-minimized, key-protected by Windows Credential Manager, and advisory only; it has no system tools.
-- Optimize rejects performance-oriented current plans, weak/non-CPU baselines, inadequate samples, and non-comparable repeats. A pending test has a persisted rollback GUID and is restored on exit or next startup.
-
-## Honest release boundaries
-
-Frame presentation, temperatures/power/fans, process GPU/network attribution, privileged process mutations, persistent long-term history, custom Windows notifications, a bundled commercial AI service, broad automatic system tuning, and a production anti-cheat-reviewed overlay are not implemented and are not simulated. See `docs/KNOWN_LIMITATIONS.md` for the complete list.
+See [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md),
+[SURGE_SAFETY.md](SURGE_SAFETY.md), and the repository security policy before
+testing elevated or remote-control functionality.
 
 ## Release disposition
 
-The portable x64 build is suitable as a local Kerneon 1.0.0 release candidate. Automated tests, static analysis, short soak, startup, tray lifecycle, and primary visual paths passed. A wider hardware/DPI matrix, code signing, physical sleep/resume, and the included two-hour soak remain appropriate before broad public distribution.
+`0.1.0-preview.1` is suitable for opt-in public testing by users who understand
+the limitations above. It is intended to gather reproducible compatibility and
+performance evidence before a stable release. Report defects through GitHub
+Issues and security-sensitive findings through GitHub private vulnerability
+reporting.

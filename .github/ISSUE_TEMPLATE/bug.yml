@@ -1,0 +1,63 @@
+name: Bug report
+description: Report reproducible incorrect behaviour in the technical preview.
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include pairing codes, API keys, Windows credentials or unredacted private diagnostics. Use the private security form for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: Kerneon version
+      placeholder: 0.1.0-preview.1
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2, build number
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Relevant hardware
+      description: CPU, GPU, memory and display configuration; omit serial numbers.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: A short numbered sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+  - type: dropdown
+    id: surge
+    attributes:
+      label: Surge or Tuning Lab state
+      options:
+        - Both were off
+        - Surge Guarded
+        - Surge Aggressive
+        - Tuning Lab estimating
+        - Tuning Lab testing or retained
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed secrets, pairing credentials and personally identifying data.
+          required: true

@@ -3,8 +3,10 @@ package main
 import "time"
 
 const (
-	appName    = "Kerneon"
-	appVersion = "1.0.0"
+	appName      = "Kerneon"
+	appVersion   = "0.1.0-preview.1"
+	appCreator   = "Ryan Horth"
+	appPublisher = "Ryan Horth"
 )
 
 type CPUData struct {
@@ -30,6 +32,17 @@ type DiskData struct {
 	Total, Free                                uint64
 	Volumes                                    []VolumeData
 	ProviderError                              string
+}
+
+// LatencyData contains low-overhead Windows scheduler/interrupt/page-in
+// signals. They are correlation evidence, not a claim that a single sample
+// proves which driver or game subsystem caused a hitch.
+type LatencyData struct {
+	DPCTimePercent, InterruptTimePercent float64
+	InterruptsPerSec, ContextSwitches    float64
+	ProcessorQueue, PageReadsPerSec      float64
+	Provider, Error                      string
+	Available                            bool
 }
 
 type VolumeData struct {
@@ -62,6 +75,15 @@ type ProcessMetric struct {
 	Started                       time.Time
 }
 
+type ProcessHistorySample struct {
+	At                time.Time
+	PID               uint32
+	Name              string
+	CPU               float64
+	WorkingSet        uint64
+	ReadBps, WriteBps float64
+}
+
 type HistorySample struct {
 	At                                        time.Time
 	CPU, GPU, Memory, Disk, Down, Up, Latency float64
@@ -90,8 +112,10 @@ type Snapshot struct {
 	Memory                                 MemoryData
 	GPU                                    GPUData
 	Disk                                   DiskData
+	Latency                                LatencyData
 	Network                                NetworkData
 	Processes                              []ProcessMetric
+	ProcessHistory                         []ProcessHistorySample
 	History                                []HistorySample
 	Events                                 []Event
 	System                                 SystemData

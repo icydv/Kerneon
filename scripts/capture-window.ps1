@@ -1,8 +1,12 @@
 param(
     [Parameter(Mandatory=$true)][string]$Executable,
     [Parameter(Mandatory=$true)][string]$Output,
+    [int]$TargetProcessId = 0,
+    [long]$TargetWindowHandle = 0,
     [int]$ClickX = -1,
-    [int]$ClickY = -1
+    [int]$ClickY = -1,
+    [int]$HoverX = -1,
+    [int]$HoverY = -1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,18 +23,27 @@ public static class KerneonCapture {
 '@
 
 $resolved = [IO.Path]::GetFullPath($Executable)
-$process = Get-Process Kerneon -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $resolved } | Select-Object -First 1
+$process = if ($TargetProcessId -gt 0) { Get-Process -Id $TargetProcessId -ErrorAction SilentlyContinue } else { Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $resolved -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1 }
 if (-not $process) {
     $process = Start-Process -FilePath $resolved -PassThru
     Start-Sleep -Milliseconds 1800
     $process.Refresh()
 }
-$hwnd = $process.MainWindowHandle
+$hwnd = if ($TargetWindowHandle -ne 0) { [IntPtr]$TargetWindowHandle } else { $process.MainWindowHandle }
 if ($hwnd -eq [IntPtr]::Zero) { throw 'Kerneon main window was not available.' }
 if ($ClickX -ge 0 -and $ClickY -ge 0) {
     $packed = [IntPtr](($ClickY -shl 16) -bor ($ClickX -band 0xffff))
+	[KerneonCapture]::PostMessage($hwnd, 0x0200, [UIntPtr]::Zero, $packed) | Out-Null
+	Start-Sleep -Milliseconds 80
+	[KerneonCapture]::PostMessage($hwnd, 0x0201, ([UIntPtr]::new([uint64]1)), $packed) | Out-Null
+	Start-Sleep -Milliseconds 55
     [KerneonCapture]::PostMessage($hwnd, 0x0202, [UIntPtr]::Zero, $packed) | Out-Null
     Start-Sleep -Milliseconds 450
+}
+if ($HoverX -ge 0 -and $HoverY -ge 0) {
+    $packed = [IntPtr](($HoverY -shl 16) -bor ($HoverX -band 0xffff))
+    [KerneonCapture]::PostMessage($hwnd, 0x0200, [UIntPtr]::Zero, $packed) | Out-Null
+    Start-Sleep -Milliseconds 180
 }
 $rect = New-Object KerneonCapture+RECT
 if (-not [KerneonCapture]::GetWindowRect($hwnd, [ref]$rect)) { throw 'Could not read the window bounds.' }

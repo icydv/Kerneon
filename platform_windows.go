@@ -15,19 +15,25 @@ const (
 	WM_CLOSE          = 0x0010
 	WM_ERASEBKGND     = 0x0014
 	WM_GETMINMAXINFO  = 0x0024
+	WM_NCHITTEST      = 0x0084
+	WM_DISPLAYCHANGE  = 0x007E
 	WM_SETCURSOR      = 0x0020
 	WM_KEYDOWN        = 0x0100
 	WM_CHAR           = 0x0102
 	WM_MOUSEMOVE      = 0x0200
+	WM_LBUTTONDOWN    = 0x0201
 	WM_LBUTTONUP      = 0x0202
 	WM_LBUTTONDBLCLK  = 0x0203
 	WM_RBUTTONUP      = 0x0205
 	WM_MOUSEWHEEL     = 0x020A
+	WM_CAPTURECHANGED = 0x0215
 	WM_DPICHANGED     = 0x02E0
 	WM_POWERBROADCAST = 0x0218
 	WM_APP            = 0x8000
 	WM_APP_RENDER     = WM_APP + 1
 	WM_APP_TRAY       = WM_APP + 2
+	WM_APP_REMOTE     = WM_APP + 3
+	WM_APP_FPS_RENDER = WM_APP + 4
 
 	SIZE_MINIMIZED = 1
 	VK_ESCAPE      = 0x1B
@@ -36,12 +42,14 @@ const (
 	VK_TAB         = 0x09
 
 	WS_OVERLAPPEDWINDOW            = 0x00CF0000
+	WS_POPUP                       = 0x80000000
 	WS_VISIBLE                     = 0x10000000
 	WS_CLIPCHILDREN                = 0x02000000
 	CW_USEDEFAULT                  = 0x80000000
 	SW_SHOW                        = 5
 	SW_HIDE                        = 0
 	SW_RESTORE                     = 9
+	SW_SHOWNOACTIVATE              = 4
 	CS_HREDRAW                     = 0x0002
 	CS_VREDRAW                     = 0x0001
 	CS_DBLCLKS                     = 0x0008
@@ -68,7 +76,9 @@ const (
 	DWMWCP_ROUND                   = 2
 	SWP_NOSIZE                     = 0x0001
 	SWP_NOMOVE                     = 0x0002
+	SWP_NOZORDER                   = 0x0004
 	SWP_NOACTIVATE                 = 0x0010
+	SWP_SHOWWINDOW                 = 0x0040
 	SWP_NOOWNERZORDER              = 0x0200
 	HWND_TOPMOST                   = ^uintptr(0)
 	HWND_NOTOPMOST                 = ^uintptr(1)
@@ -78,9 +88,17 @@ const (
 	MOVEFILE_REPLACE_EXISTING      = 0x1
 	MOVEFILE_WRITE_THROUGH         = 0x8
 	MONITOR_DEFAULTTONEAREST       = 2
+	MONITOR_DEFAULTTOPRIMARY       = 1
 	WS_EX_LAYERED                  = 0x00080000
+	WS_EX_TOPMOST                  = 0x00000008
+	WS_EX_TRANSPARENT              = 0x00000020
+	WS_EX_TOOLWINDOW               = 0x00000080
+	WS_EX_NOACTIVATE               = 0x08000000
 	GWL_EXSTYLE                    = -20
 	LWA_ALPHA                      = 0x2
+	DI_NORMAL                      = 0x0003
+	VREFRESH                       = 116
+	HTTRANSPARENT                  = -1
 )
 
 type POINT struct{ X, Y int32 }
@@ -130,6 +148,7 @@ var (
 	shell32                           = syscall.NewLazyDLL("shell32.dll")
 	procRegisterClassExW              = user32.NewProc("RegisterClassExW")
 	procCreateWindowExW               = user32.NewProc("CreateWindowExW")
+	procFindWindowW                   = user32.NewProc("FindWindowW")
 	procDefWindowProcW                = user32.NewProc("DefWindowProcW")
 	procShowWindow                    = user32.NewProc("ShowWindow")
 	procDestroyWindow                 = user32.NewProc("DestroyWindow")
@@ -141,8 +160,12 @@ var (
 	procBeginPaint                    = user32.NewProc("BeginPaint")
 	procEndPaint                      = user32.NewProc("EndPaint")
 	procGetClientRect                 = user32.NewProc("GetClientRect")
+	procGetDC                         = user32.NewProc("GetDC")
+	procReleaseDC                     = user32.NewProc("ReleaseDC")
 	procGetWindowRect                 = user32.NewProc("GetWindowRect")
+	procIsIconic                      = user32.NewProc("IsIconic")
 	procGetForegroundWindow           = user32.NewProc("GetForegroundWindow")
+	procGetWindowThreadProcessId      = user32.NewProc("GetWindowThreadProcessId")
 	procMonitorFromWindow             = user32.NewProc("MonitorFromWindow")
 	procGetMonitorInfoW               = user32.NewProc("GetMonitorInfoW")
 	procInvalidateRect                = user32.NewProc("InvalidateRect")
@@ -154,6 +177,7 @@ var (
 	procGetWindowLongPtrW             = user32.NewProc("GetWindowLongPtrW")
 	procSetWindowLongPtrW             = user32.NewProc("SetWindowLongPtrW")
 	procSetLayeredWindowAttributes    = user32.NewProc("SetLayeredWindowAttributes")
+	procDrawIconEx                    = user32.NewProc("DrawIconEx")
 	procIsWindowVisible               = user32.NewProc("IsWindowVisible")
 	procGetDpiForWindow               = user32.NewProc("GetDpiForWindow")
 	procSetProcessDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
@@ -168,6 +192,7 @@ var (
 	procGlobalLock                    = kernel32.NewProc("GlobalLock")
 	procGlobalUnlock                  = kernel32.NewProc("GlobalUnlock")
 	procGlobalSize                    = kernel32.NewProc("GlobalSize")
+	procCreateMutexW                  = kernel32.NewProc("CreateMutexW")
 	procRtlMoveMemory                 = ntdll.NewProc("RtlMoveMemory")
 	procMoveFileExW                   = kernel32.NewProc("MoveFileExW")
 	procGetModuleHandleW              = kernel32.NewProc("GetModuleHandleW")
@@ -188,6 +213,7 @@ var (
 	procPolygon                       = gdi32.NewProc("Polygon")
 	procSetTextColor                  = gdi32.NewProc("SetTextColor")
 	procSetBkMode                     = gdi32.NewProc("SetBkMode")
+	procGetDeviceCaps                 = gdi32.NewProc("GetDeviceCaps")
 	procDrawTextW                     = user32.NewProc("DrawTextW")
 	procCreateFontW                   = gdi32.NewProc("CreateFontW")
 	procGetStockObject                = gdi32.NewProc("GetStockObject")

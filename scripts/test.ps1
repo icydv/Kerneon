@@ -13,7 +13,9 @@ Push-Location $projectRoot
 try {
     & $go test -count=1 -v ./...
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
-    & $go vet ./...
+    # The ADLX/Win32 FFI deliberately reconstructs vendor-owned pointers from
+    # uintptr vtable results. Disable only vet's unsafeptr heuristic.
+    & $go vet -unsafeptr=false ./...
     if ($LASTEXITCODE -ne 0) { throw 'Static analysis failed.' }
 } finally {
     Pop-Location

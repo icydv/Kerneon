@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/icydv/Kerneon/security/advisories/new
+    about: Report an unpatched vulnerability privately.
+  - name: Documentation and known limitations
+    url: https://github.com/icydv/Kerneon/blob/main/docs/KNOWN_LIMITATIONS.md
+    about: Check the current preview boundaries before filing an issue.

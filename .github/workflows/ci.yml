@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: Windows test and build
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Test
+        run: go test -count=1 ./...
+      - name: Vet documented Win32 code
+        run: go vet -unsafeptr=false ./...
+      - name: Build portable preview
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          go build -buildvcs=false -trimpath -ldflags '-s -w -H=windowsgui' -o dist/Kerneon-0.1.0-preview.1-portable.exe .
+          $hash = (Get-FileHash -Algorithm SHA256 dist/Kerneon-0.1.0-preview.1-portable.exe).Hash.ToLowerInvariant()
+          "$hash *Kerneon-0.1.0-preview.1-portable.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+      - name: Upload verified build
+        uses: actions/upload-artifact@v6
+        with:
+          name: Kerneon-Windows-x64
+          path: |
+            dist/Kerneon-0.1.0-preview.1-portable.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error

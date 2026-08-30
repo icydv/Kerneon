@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+      Id="*"
+      Name="Kerneon"
+      Language="1033"
+      Version="0.1.0"
+      Manufacturer="Ryan Horth"
+      UpgradeCode="{B95FC74F-ECA4-49E7-8F7B-4677C953DD76}">
+
+    <Package
+        InstallerVersion="500"
+        Compressed="yes"
+        InstallScope="perMachine"
+        InstallPrivileges="elevated"
+        Platform="x64"
+        Description="Kerneon system performance monitor and measured session regulator"
+        Manufacturer="Ryan Horth" />
+
+    <MajorUpgrade
+        DowngradeErrorMessage="A newer version of Kerneon is already installed."
+        Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPPRODUCTICON" Value="KerneonProductIcon" />
+    <Property Id="ARPCONTACT" Value="Ryan Horth" />
+    <Property Id="MSIFASTINSTALL" Value="1" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" After="CostFinalize" />
+
+    <Icon Id="KerneonProductIcon" SourceFile="$(var.InstallerAssetDir)\Kerneon.ico" />
+    <Binary Id="KerneonInstallerBackground" SourceFile="$(var.InstallerAssetDir)\dialog.bmp" />
+
+    <Condition Message="Kerneon requires 64-bit Windows.">VersionNT64</Condition>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="Kerneon">
+          <Directory Id="DOCSFOLDER" Name="Docs" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="KerneonProgramMenuFolder" Name="Kerneon" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="KerneonExecutableComponent" Guid="*" Win64="yes">
+        <File Id="KerneonExecutable" Name="Kerneon.exe" Source="$(var.AppExe)" KeyPath="yes" Checksum="yes" />
+      </Component>
+      <Component Id="KerneonRootDocumentsComponent" Guid="{55818F27-5010-443B-92EB-C2EDFB5E39BA}" Win64="yes">
+        <File Id="KerneonLicense" Name="LICENSE.txt" Source="$(var.RootDir)\LICENSE.txt" KeyPath="yes" />
+        <File Id="KerneonThirdParty" Name="THIRD_PARTY_NOTICES.md" Source="$(var.RootDir)\THIRD_PARTY_NOTICES.md" />
+        <File Id="KerneonReadme" Name="README.md" Source="$(var.RootDir)\README.md" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DOCSFOLDER">
+      <Component Id="KerneonDocumentationComponent" Guid="{3120F9ED-DCA5-4DA4-A1F7-2F7A11304EE6}" Win64="yes">
+        <File Id="DocAIInsights" Source="$(var.RootDir)\docs\AI_INSIGHTS.md" KeyPath="yes" />
+        <File Id="DocInstallation" Source="$(var.RootDir)\docs\INSTALLATION.md" />
+        <File Id="DocArchitecture" Source="$(var.RootDir)\docs\ARCHITECTURE.md" />
+        <File Id="DocAudit" Source="$(var.RootDir)\docs\AUDIT.md" />
+        <File Id="DocLimitations" Source="$(var.RootDir)\docs\KNOWN_LIMITATIONS.md" />
+        <File Id="DocOptimize" Source="$(var.RootDir)\docs\OPTIMIZE.md" />
+        <File Id="DocPerformanceStack" Source="$(var.RootDir)\docs\PERFORMANCE_STACK.md" />
+        <File Id="DocReleaseReport" Source="$(var.RootDir)\docs\RELEASE_REPORT.md" />
+        <File Id="DocSecurityPrivacy" Source="$(var.RootDir)\docs\SECURITY_PRIVACY.md" />
+        <File Id="DocSurgeSafety" Source="$(var.RootDir)\docs\SURGE_SAFETY.md" />
+        <File Id="DocTesting" Source="$(var.RootDir)\docs\TESTING.md" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="KerneonProgramMenuFolder">
+      <Component Id="KerneonStartMenuShortcutComponent" Guid="{BA93D384-74D7-43EF-AE27-2B04319A1913}" Win64="yes">
+        <Shortcut
+            Id="KerneonStartMenuShortcut"
+            Name="Kerneon"
+            Description="Understand and improve this PC with measured evidence"
+            Target="[INSTALLFOLDER]Kerneon.exe"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="KerneonProductIcon" />
+        <RemoveFolder Id="RemoveKerneonProgramMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Kerneon" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="KerneonDesktopShortcutComponent" Guid="{1CBEB407-FA61-42C6-B487-4B2421D8751C}" Win64="yes">
+        <Shortcut
+            Id="KerneonDesktopShortcut"
+            Name="Kerneon"
+            Description="Understand and improve this PC with measured evidence"
+            Target="[INSTALLFOLDER]Kerneon.exe"
+            WorkingDirectory="INSTALLFOLDER"
+            Icon="KerneonProductIcon" />
+        <RegistryValue Root="HKCU" Key="Software\Kerneon" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="KerneonFeature" Title="Kerneon" Level="1" Absent="disallow" Display="hidden">
+      <ComponentRef Id="KerneonExecutableComponent" />
+      <ComponentRef Id="KerneonRootDocumentsComponent" />
+      <ComponentRef Id="KerneonDocumentationComponent" />
+      <ComponentRef Id="KerneonStartMenuShortcutComponent" />
+      <ComponentRef Id="KerneonDesktopShortcutComponent" />
+    </Feature>
+
+    <CustomAction
+        Id="LaunchKerneon"
+        FileKey="KerneonExecutable"
+        ExeCommand=""
+        Execute="immediate"
+        Impersonate="yes"
+        Return="asyncNoWait" />
+
+    <UIRef Id="KerneonUI" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.InstallerAssetDir)\banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.InstallerAssetDir)\dialog-standard.bmp" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.InstallerDir)\License.rtf" />
+  </Product>
+</Wix>

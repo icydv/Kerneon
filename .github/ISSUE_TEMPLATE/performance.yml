@@ -1,0 +1,43 @@
+name: Performance evidence
+description: Share a repeatable Surge result or an intervention that did not help.
+title: "[Performance]: "
+labels: [performance, evidence]
+body:
+  - type: markdown
+    attributes:
+      value: A neutral or negative result is as useful as a gain. Keep unlike gameplay windows separate.
+  - type: textarea
+    id: system
+    attributes:
+      label: System and game configuration
+      description: CPU, GPU, memory, game/version, resolution, graphics preset, frame cap and display refresh rate.
+    validations:
+      required: true
+  - type: textarea
+    id: method
+    attributes:
+      label: Repeatable test route
+      description: Exact scene, duration, run order and how equivalent workload was maintained.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Results
+      description: Include each off/on window’s average FPS, 1% low, p99 frame time and hitches/minute.
+    validations:
+      required: true
+  - type: textarea
+    id: action
+    attributes:
+      label: What Surge changed
+      description: Copy the sanitized journal explanation and whether the treatment was retained or withdrawn.
+    validations:
+      required: true
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Data check
+      options:
+        - label: I removed usernames, paths, IP addresses, pairing credentials and API keys.
+          required: true

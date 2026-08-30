@@ -100,7 +100,7 @@ func TestPDHProviderFailsSoftly(t *testing.T) {
 	provider := newPDHQuery()
 	defer provider.Close()
 	time.Sleep(150 * time.Millisecond)
-	disk, gpu := provider.Sample()
+	disk, gpu, latency := provider.sampleAll()
 	if disk.Usage < 0 || disk.Usage > 100 || math.IsNaN(disk.Usage) {
 		t.Fatalf("invalid disk sample: %+v", disk)
 	}
@@ -109,5 +109,8 @@ func TestPDHProviderFailsSoftly(t *testing.T) {
 	}
 	if provider.handle == 0 && disk.ProviderError == "" && gpu.Error == "" {
 		t.Fatal("unavailable PDH provider did not report an error")
+	}
+	if latency.DPCTimePercent < 0 || latency.InterruptTimePercent < 0 || latency.ProcessorQueue < 0 || math.IsNaN(latency.DPCTimePercent) {
+		t.Fatalf("invalid latency sample: %+v", latency)
 	}
 }

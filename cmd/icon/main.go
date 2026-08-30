@@ -1,5 +1,5 @@
-// Command icon renders Kerneon's pressure-arc monogram using only the Go
-// standard library. The geometry stays reproducible at every release size.
+// Command icon renders the canonical Kerneon pressure-arc monogram using only
+// the Go standard library. The native UI and remote SVG use these same ratios.
 package main
 
 import (
@@ -18,6 +18,13 @@ const (
 func main() {
 	img := image.NewNRGBA(image.Rect(0, 0, size*scale, size*scale))
 	center := float64(size*scale) / 2
+	designRadius := 250.0 * scale
+	arcRadius := designRadius * 0.65
+	strokeRadius := designRadius * 0.14 / 2
+	rayStartX := -designRadius * 0.04
+	rayEndX := designRadius * 0.54
+	rayEndY := designRadius * 0.51
+	mark := color.NRGBA{R: 224, G: 244, B: 246, A: 255}
 	for y := 0; y < size*scale; y++ {
 		for x := 0; x < size*scale; x++ {
 			dx, dy := float64(x)+0.5-center, float64(y)+0.5-center
@@ -26,20 +33,28 @@ func main() {
 			if angle < 0 {
 				angle += 360
 			}
-			var pixel color.NRGBA
-			switch {
-			case distance <= 218*scale:
-				pixel = color.NRGBA{R: 20, G: 21, B: 24, A: 255}
+			pixel := color.NRGBA{}
+
+			arcDistance := math.Inf(1)
+			if angle >= 100 && angle <= 260 {
+				arcDistance = math.Abs(distance - arcRadius)
 			}
-			// A pressure arc plus two rays forms a restrained, asymmetric K.
-			if math.Abs(distance-142*scale) <= 15*scale && angle >= 100 && angle <= 260 {
-				pixel = color.NRGBA{R: 232, G: 234, B: 239, A: 255}
+			for _, degrees := range []float64{100, 260} {
+				radians := degrees * math.Pi / 180
+				capDistance := math.Hypot(dx-arcRadius*math.Cos(radians), dy-arcRadius*math.Sin(radians))
+				arcDistance = math.Min(arcDistance, capDistance)
 			}
-			if segmentDistance(dx, dy, -8*scale, 0, 118*scale, -112*scale) <= 15*scale || segmentDistance(dx, dy, -8*scale, 0, 118*scale, 112*scale) <= 15*scale {
-				pixel = color.NRGBA{R: 232, G: 234, B: 239, A: 255}
+			rayDistance := math.Min(
+				segmentDistance(dx, dy, rayStartX, 0, rayEndX, -rayEndY),
+				segmentDistance(dx, dy, rayStartX, 0, rayEndX, rayEndY),
+			)
+			markDistance := math.Min(arcDistance, rayDistance)
+			if markDistance <= strokeRadius+5*scale {
+				falloff := 1 - math.Max(0, markDistance-strokeRadius)/(5*scale)
+				pixel = color.NRGBA{R: mark.R, G: mark.G, B: mark.B, A: uint8(math.Round(24 * falloff))}
 			}
-			if distance <= 18*scale {
-				pixel = color.NRGBA{R: 139, G: 171, B: 216, A: 255}
+			if markDistance <= strokeRadius {
+				pixel = mark
 			}
 			img.SetNRGBA(x, y, pixel)
 		}

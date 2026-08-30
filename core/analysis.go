@@ -102,8 +102,6 @@ func ExplainPressure(v PressureInput) Pressure {
 		return Pressure{"cpu", "CPU headroom is limited", "Processor activity is near capacity across the current sample window.", 2}
 	case v.Disk >= 90:
 		return Pressure{"disk", "Storage is under sustained load", "Disk active time is above 90%; storage may delay other work.", 2}
-	case v.PacketLoss >= 3 || v.Latency >= 120:
-		return Pressure{"network", "Network quality has degraded", "Latency or recent packet loss is high enough to affect interactive traffic.", 2}
 	case v.GPU >= 65 && v.GPU >= v.CPU:
 		return Pressure{"gpu", "GPU is the main system load", "Graphics activity is currently higher than the other measured resources.", 1}
 	case v.CPU >= 65:
