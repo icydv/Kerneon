@@ -4,6 +4,7 @@
 /retired-*.exe
 /previous-portable-*/
 /release-stage-*/
+/repo-screenshot-stage/
 /qa/
 /qa-*.png
 /third_party/

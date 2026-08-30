@@ -22,6 +22,33 @@ Kerneon is a native Windows performance monitor and measured session regulator d
 
 The application presents synchronized CPU, GPU, memory, storage, network, process, latency, system, event, and recent-history views. It is local-first: no account, background service, bundled driver, code injection, or administrator access is required for monitoring or ordinary Surge. Optional AI insights are generated only on request with a user-supplied OpenAI API key. The separately consented Tuning Lab requires an explicit elevated session when a supported hardware control is armed.
 
+## Product tour
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="docs/images/overview.png"><img src="docs/images/overview.png" alt="Kerneon Overview showing the live experience score, resource cards and synchronized activity graph"></a><br>
+      <strong>Overview.</strong> Live system pressure, an explainable experience score, and synchronized resource history.
+    </td>
+    <td width="50%">
+      <a href="docs/images/surge.png"><img src="docs/images/surge.png" alt="Kerneon Surge in Guarded mode showing hardware capability checks and the rollback journal"></a><br>
+      <strong>Surge.</strong> Capability-gated treatments, plain-language explanations, frame proof, and an exact rollback journal.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="docs/images/event-lens.png"><img src="docs/images/event-lens.png" alt="Kerneon Event Lens separating significant failures from ordinary Windows event noise"></a><br>
+      <strong>Event Lens.</strong> Windows events grouped by significance so routine noise does not bury useful evidence.
+    </td>
+    <td width="50%">
+      <a href="docs/images/remote-link.png"><img src="docs/images/remote-link.png" alt="Kerneon Remote Link resting state with the private LAN server disabled"></a><br>
+      <strong>Remote Link.</strong> An explicitly enabled, local-network companion with separate pairing, control, screen-view, and input grants.
+    </td>
+  </tr>
+</table>
+
+Screenshots were captured from the `0.1.0-preview.1` Windows build. Values and available hardware controls vary by system; no pairing credential or device address is included in the repository images.
+
 ## The Surge promise
 
 Surge finds the limiting factor, tests a reversible response, and keeps it only when frame data proves that it helped.
