@@ -32,7 +32,7 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 dist/Kerneon-0.1.0-preview.1-portable.exe).Hash.ToLowerInvariant()
           "$hash *Kerneon-0.1.0-preview.1-portable.exe" | Set-Content -Encoding ascii dist/SHA256SUMS.txt
       - name: Upload verified build
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Kerneon-Windows-x64
           path: |
